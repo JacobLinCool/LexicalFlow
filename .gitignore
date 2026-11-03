@@ -134,3 +134,13 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# SvelteKit
+/.svelte-kit
+/build
+vite.config.ts.timestamp-*
+
+# Question pipeline downloads, model caches and intermediates
+pipeline/.cache/
+pipeline/.venv/
+pipeline/__pycache__/

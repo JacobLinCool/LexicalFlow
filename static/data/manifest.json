@@ -1,0 +1,23 @@
+{
+  "version": "2026-11-03",
+  "questionCount": 22272,
+  "vocabularyCount": 12000,
+  "categories": {
+    "travel": {
+      "file": "questions/travel.json",
+      "count": 2210
+    },
+    "conversation": {
+      "file": "questions/conversation.json",
+      "count": 15865
+    },
+    "networking": {
+      "file": "questions/networking.json",
+      "count": 2139
+    },
+    "academic": {
+      "file": "questions/academic.json",
+      "count": 2058
+    }
+  }
+}

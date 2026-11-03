@@ -1,3 +1,4 @@
+import type { ModeId } from './modes';
 import type { Outcome, Question, Result } from './types';
 
 const PROGRESS_KEY = 'lexical-flow:progress:v1';
@@ -17,6 +18,16 @@ export interface Progress {
 	words: Record<string, WordStats>;
 	/** Recent question ids, so a reload does not replay what was just seen. */
 	recent: string[];
+	/** Highest-scoring completed run per mode. */
+	bests: Partial<Record<ModeId, Best>>;
+}
+
+export interface Best {
+	score: number;
+	correct: number;
+	count: number;
+	/** Epoch milliseconds. */
+	at: number;
 }
 
 export interface Settings {
@@ -32,7 +43,8 @@ export function emptyProgress(): Progress {
 		answerMs: 0,
 		totalScore: 0,
 		words: {},
-		recent: []
+		recent: [],
+		bests: {}
 	};
 }
 
@@ -96,4 +108,12 @@ export function record(progress: Progress, question: Question, result: Result): 
 export function averageMs(progress: Progress): number | null {
 	const answered = progress.correct + progress.incorrect;
 	return answered ? progress.answerMs / answered : null;
+}
+
+/** Keep `run` if it beats the stored best for `mode`; returns whether it did. */
+export function recordBest(progress: Progress, mode: ModeId, run: Best): boolean {
+	const best = progress.bests[mode];
+	if (run.score <= 0 || (best && best.score >= run.score)) return false;
+	progress.bests[mode] = run;
+	return true;
 }

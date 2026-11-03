@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Deck } from './deck';
-import { averageMs, emptyProgress, record } from './progress';
+import { damage, heal, hpDelta } from './modes';
+import { averageMs, emptyProgress, record, recordBest } from './progress';
 import { score } from './scoring';
 import type { Question } from './types';
 
@@ -72,6 +73,30 @@ describe('record', () => {
 		expect(p).toMatchObject({ attempted: 3, correct: 1, incorrect: 1, timedOut: 1, totalScore: 100 });
 		expect(averageMs(p)).toBe(1000);
 		expect(p.words.suggest.slice(0, 5)).toEqual([3, 1, 1, 1, 2000]);
+	});
+});
+
+describe('survival HP', () => {
+	it('heals by speed on a correct answer', () => {
+		expect(heal(100)).toBe(10);
+		expect(heal(50)).toBe(5);
+		expect(hpDelta({ outcome: 'correct', picked: 'up', ms: 3000, score: 50 }, 0)).toBe(5);
+	});
+	it('charges a growing penalty for misses and timeouts', () => {
+		expect(damage(0)).toBe(20);
+		expect(damage(24)).toBe(20);
+		expect(damage(25)).toBe(25);
+		expect(hpDelta({ outcome: 'timeout', picked: null, ms: 5000, score: 0 }, 50)).toBe(-30);
+	});
+});
+
+describe('recordBest', () => {
+	it('keeps only the higher score per mode', () => {
+		const p = emptyProgress();
+		expect(recordBest(p, 'quick', { score: 900, correct: 10, count: 30, at: 1 })).toBe(true);
+		expect(recordBest(p, 'quick', { score: 800, correct: 12, count: 30, at: 2 })).toBe(false);
+		expect(recordBest(p, 'standard', { score: 100, correct: 1, count: 100, at: 3 })).toBe(true);
+		expect(p.bests.quick?.score).toBe(900);
 	});
 });
 

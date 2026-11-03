@@ -1,42 +1,53 @@
 <script lang="ts">
-	import type { Phase } from '#lib/game.svelte.ts';
-	import { DIRECTIONS, type Direction, type Question } from '#lib/types.ts';
+	import type { Option, Phase } from '#lib/game.svelte.ts';
+	import { DIRECTIONS, type Direction } from '#lib/types.ts';
 
 	interface Props {
-		question: Question;
+		options: Partial<Record<Direction, Option>>;
+		/** The correct direction, for question feedback; absent for cards. */
+		answer?: Direction;
 		phase: Phase;
 		picked: Direction | null;
 		onpick: (direction: Direction, at: number) => void;
 	}
 
-	let { question, phase, picked, onpick }: Props = $props();
+	let { options, answer, phase, picked, onpick }: Props = $props();
 
 	const ARROWS: Record<Direction, string> = { up: '↑', left: '←', down: '↓', right: '→' };
+	const ready = $derived(phase === 'active' || phase === 'card');
+	/** Up/down-only cards stack in one column instead of leaving the side cells empty. */
+	const vertical = $derived(!options.left && !options.right);
 
 	function tone(direction: Direction): string | undefined {
 		if (phase === 'locked') return direction === picked ? 'selected' : undefined;
 		if (phase !== 'feedback') return undefined;
-		if (direction === question.answer) return picked === direction ? 'correct' : 'reveal';
+		if (direction === answer) return picked === direction ? 'correct' : 'reveal';
 		if (direction === picked) return 'wrong';
 		return 'muted';
 	}
 </script>
 
-<div class="choices" class:ready={phase === 'active'} role="group" aria-label="Choices">
+<div class="choices" class:ready class:vertical role="group" aria-label="Choices">
 	{#each DIRECTIONS as direction (direction)}
-		<button
-			type="button"
-			class={['choice', direction, tone(direction)]}
-			tabindex="-1"
-			disabled={phase !== 'active'}
-			onpointerdown={(e) => {
-				e.preventDefault();
-				onpick(direction, e.timeStamp);
-			}}
-		>
-			<span class="arrow" aria-hidden="true">{ARROWS[direction]}</span>
-			<span>{question.choices[direction]}</span>
-		</button>
+		{@const option = options[direction]}
+		{#if option}
+			<button
+				type="button"
+				class={['choice', direction, tone(direction), option.detail && 'rich']}
+				tabindex="-1"
+				disabled={!ready}
+				onpointerdown={(e) => {
+					e.preventDefault();
+					onpick(direction, e.timeStamp);
+				}}
+			>
+				<span class="arrow" aria-hidden="true">{ARROWS[direction]}</span>
+				<span class="label">
+					{option.label}
+					{#if option.detail}<small>{option.detail}</small>{/if}
+				</span>
+			</button>
+		{/if}
 	{/each}
 </div>
 
@@ -51,6 +62,11 @@
 		justify-content: start;
 		gap: 0.5rem 0.75rem;
 		font-size: var(--choice-size);
+	}
+
+	.vertical {
+		grid-template-columns: auto;
+		grid-template-areas: 'up' 'down';
 	}
 
 	.up {
@@ -95,6 +111,23 @@
 
 	.ready .choice:hover {
 		background: var(--surface-hover);
+	}
+
+	.rich {
+		align-items: center;
+		justify-content: flex-start;
+		min-width: min(11em, 40vw);
+		padding: 0.6em 1.1em;
+		text-align: left;
+	}
+
+	.label small {
+		display: block;
+		margin-top: 0.15em;
+		font-size: 0.68em;
+		font-weight: 500;
+		opacity: 0.55;
+		letter-spacing: 0;
 	}
 
 	.arrow {

@@ -2,11 +2,13 @@
 	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
 	import Backdrop from '#lib/components/Backdrop.svelte';
+	import CardLine from '#lib/components/CardLine.svelte';
 	import Choices from '#lib/components/Choices.svelte';
 	import Sentence from '#lib/components/Sentence.svelte';
 	import { loadQuestions } from '#lib/data.ts';
 	import { Game, TIMING } from '#lib/game.svelte.ts';
-	import type { Direction } from '#lib/types.ts';
+	import { MAX_HP } from '#lib/modes.ts';
+	import type { Direction, Question } from '#lib/types.ts';
 
 	const KEYS: Record<string, Direction> = {
 		KeyW: 'up',
@@ -27,7 +29,6 @@
 	let viewport = $state(800);
 	let heights = $state<Record<number, number>>({});
 	let choicesHeight = $state(170);
-	let started = $state(false);
 	/** Lines snap into place on first layout and only animate once measured. */
 	let settled = $state(false);
 
@@ -69,18 +70,16 @@
 			if (!e.repeat) game.toggleSound();
 			return;
 		}
+		if (e.code === 'Escape') {
+			if (!e.repeat) game.quit();
+			return;
+		}
 		const direction = KEYS[e.code] ?? KEYS[e.key];
 		if (!direction) return;
 		e.preventDefault();
 		// A held key auto-repeats; only a fresh press may answer.
 		if (e.repeat) return;
-		if (game.phase === 'idle') return begin();
-		game.answer(direction, e.timeStamp);
-	}
-
-	function begin() {
-		started = true;
-		game.begin();
+		game.press(direction, e.timeStamp);
 	}
 
 	function percent(x: number | null) {
@@ -110,6 +109,12 @@
 		};
 	});
 
+	function choiceOptions(question: Question | undefined) {
+		if (!question) return {};
+		const c = question.choices;
+		return { up: { label: c.up }, left: { label: c.left }, down: { label: c.down }, right: { label: c.right } };
+	}
+
 	const line = $derived(game.line);
 	const outcome = $derived(line?.result?.outcome);
 </script>
@@ -121,12 +126,12 @@
 
 <svelte:window {onkeydown} bind:innerHeight={viewport} />
 
-<Backdrop category={line?.question.category} />
+<Backdrop category={line?.question?.category} />
 
 <main
 	class="stage"
 	style:--scroll-ms="{TIMING.scroll}ms"
-	onpointerdown={() => game.phase === 'idle' && begin()}
+	onpointerdown={(e) => game.phase === 'idle' && game.press('up', e.timeStamp)}
 >
 	{#if game.phase === 'loading'}
 		<p class="status" style:top="{anchor}px">Loading…</p>
@@ -144,12 +149,16 @@
 						style={look(distance)}
 						aria-hidden={distance !== 0}
 					>
-						<Sentence
-							question={item.question}
-							result={item.result}
-							active={distance === 0}
-							phase={game.phase}
-						/>
+						{#if item.question}
+							<Sentence
+								question={item.question}
+								result={item.result}
+								active={distance === 0}
+								phase={game.phase}
+							/>
+						{:else if item.card}
+							<CardLine card={item.card} />
+						{/if}
 					</div>
 				{/if}
 			{/each}
@@ -163,14 +172,15 @@
 						<div bind:offsetHeight={choicesHeight} in:fly={{ y: 10, duration: TIMING.scroll - 40, delay: 40 }}>
 							{#if game.phase === 'idle'}
 								<p class="hint">
-									Press <kbd>W A S D</kbd> or <kbd>← ↑ → ↓</kbd> to {started ? 'continue' : 'begin'}.
+									Press <kbd>W A S D</kbd> or <kbd>← ↑ → ↓</kbd> to continue.
 								</p>
 							{:else}
 								<Choices
-									question={line.question}
+									options={line.card?.options ?? choiceOptions(line.question)}
+									answer={line.question?.answer}
 									phase={game.phase}
 									picked={game.picked}
-									onpick={(direction, at) => game.answer(direction, at)}
+									onpick={(direction, at) => game.press(direction, at)}
 								/>
 							{/if}
 						</div>
@@ -182,14 +192,33 @@
 
 	<footer class="hud">
 		<span class="stats" aria-label="Progress">
-			{#if game.summary.attempted}
-				<span title="Questions this session / all time">{game.session.count} · {game.summary.attempted}</span>
+			{#if game.mode}
+				{@const run = game.run}
+				<span class="mode">{game.mode.label}</span>
+				{#if game.mode.hp}
+					<span class="hp" title="HP" class:low={run.hp <= 30}>
+						<span class="hp-track"><span class="hp-fill" style:transform="scaleX({run.hp / MAX_HP})"></span></span>
+						<span class="hp-value">{run.hp}</span>
+						{#key run.delta?.key}
+							{#if run.delta}
+								<span class={['hp-delta', run.delta.value < 0 ? 'down' : 'up']}
+									>{run.delta.value > 0 ? '+' : ''}{run.delta.value}</span
+								>
+							{/if}
+						{/key}
+					</span>
+				{/if}
+				<span title="Questions">{run.count}{game.mode.limit ? ` / ${game.mode.limit}` : ''}</span>
+				<span title="Run score">{run.score.toLocaleString('en-US')} pts</span>
+				{#if game.phase !== 'card'}<span class="quit">Esc to quit</span>{/if}
+			{:else if game.summary.attempted}
+				<span title="All-time questions">{game.summary.attempted.toLocaleString('en-US')} answered</span>
 				<span title="Accuracy">{percent(game.summary.accuracy)}</span>
 				<span title="Average response time">{seconds(game.summary.averageMs)}</span>
-				<span title="Total score">{game.summary.totalScore.toLocaleString('en-US')} pts</span>
+				<span title="All-time score">{game.summary.totalScore.toLocaleString('en-US')} pts</span>
 			{/if}
 		</span>
-		{#if game.phase === 'idle' || game.phase === 'loading'}
+		{#if !game.mode}
 			<a class="credit" href="https://tatoeba.org" target="_blank" rel="noreferrer" onpointerdown={(e) => e.stopPropagation()}>
 				Sentences from Tatoeba (CC BY 2.0 FR) and WordNet
 			</a>
@@ -219,7 +248,8 @@
 
 	<p class="sr-only" aria-live="polite">
 		{#if outcome === 'correct'}Correct.{:else if outcome === 'incorrect'}Incorrect.{:else if outcome === 'timeout'}Time is up.{/if}
-		{#if game.phase === 'active' && line}{line.question.sentence.replace('___', 'blank')}{/if}
+		{#if game.phase === 'active' && line?.question}{line.question.sentence.replace('___', 'blank')}{/if}
+		{#if game.phase === 'card' && line?.card}{line.card.title} {line.card.subtitle}{/if}
 	</p>
 </main>
 
@@ -297,6 +327,78 @@
 	.stats {
 		display: flex;
 		gap: 1rem;
+	}
+
+	.mode {
+		color: var(--ink);
+		opacity: 0.75;
+		font-weight: 600;
+	}
+
+	.quit {
+		opacity: 0.6;
+	}
+
+	.hp {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.hp-track {
+		width: 7rem;
+		height: 0.3rem;
+		border-radius: 999px;
+		background: var(--surface-strong);
+		overflow: hidden;
+	}
+
+	.hp-fill {
+		display: block;
+		height: 100%;
+		background: var(--positive);
+		transform-origin: left center;
+		transition:
+			transform 300ms cubic-bezier(0.22, 0.8, 0.24, 1),
+			background-color 300ms ease;
+	}
+
+	.hp.low .hp-fill {
+		background: var(--negative);
+	}
+
+	.hp-value {
+		min-width: 2ch;
+		color: var(--ink);
+		opacity: 0.75;
+	}
+
+	.hp-delta {
+		position: absolute;
+		right: 0;
+		bottom: 100%;
+		font-weight: 600;
+		animation: delta 900ms ease-out forwards;
+	}
+
+	.hp-delta.up {
+		color: var(--positive);
+	}
+
+	.hp-delta.down {
+		color: var(--negative);
+	}
+
+	@keyframes delta {
+		from {
+			opacity: 1;
+			transform: translateY(0);
+		}
+		to {
+			opacity: 0;
+			transform: translateY(-0.6rem);
+		}
 	}
 
 	.credit {

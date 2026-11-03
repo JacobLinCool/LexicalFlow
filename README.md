@@ -13,7 +13,20 @@ clock runs out.
 | `S` / `↓` | Down   |
 | `D` / `→` | Right  |
 
-`M` toggles sound. Choices can also be tapped or clicked.
+`M` toggles sound and `Esc` abandons the current run. Choices can also be tapped or clicked.
+
+The stream opens on a mode menu, picked with the same directions:
+
+| Direction | Mode     | Run                                                                    |
+| --------- | -------- | ---------------------------------------------------------------------- |
+| Up        | Quick    | 30 questions                                                           |
+| Left      | Standard | 100 questions                                                          |
+| Right     | Survival | Endless with 100 HP: a miss costs HP, a correct answer heals by speed |
+| Down      | Practice | Endless, no stakes                                                     |
+
+In Survival a correct answer heals a tenth of its score (up to 10 HP at full speed), while a wrong
+answer or timeout costs 20 HP, rising by 5 every 25 questions so every run eventually ends. Finished
+runs show a results line in the stream, and the best score per mode is kept.
 
 - Every question has a strict five-second window. The clock starts only after the sentence has scrolled
   into place and its choices are visible; feedback and scrolling never eat into it.

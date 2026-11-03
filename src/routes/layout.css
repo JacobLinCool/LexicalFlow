@@ -14,6 +14,11 @@
 	--negative: #ff9a95;
 	--negative-surface: rgb(255 154 149 / 0.16);
 	--urgent: #ffb37a;
+	--text-secondary: rgb(255 255 255 / 0.68);
+	--text-muted: rgb(255 255 255 / 0.45);
+	/* Chart series (validated for CVD separation and contrast on the dark surface). */
+	--series-1: #3987e5;
+	--series-2: #d95926;
 
 	--line-size: clamp(1.75rem, 1rem + 2.6vw, 3.4rem);
 	--choice-size: clamp(1.05rem, 0.85rem + 0.55vw, 1.4rem);

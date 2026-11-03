@@ -3,9 +3,14 @@
 	import { fly } from 'svelte/transition';
 	import Backdrop from '#lib/components/Backdrop.svelte';
 	import CardLine from '#lib/components/CardLine.svelte';
+	import Seo from '#lib/seo/Seo.svelte';
 	import Choices from '#lib/components/Choices.svelte';
 	import Sentence from '#lib/components/Sentence.svelte';
-	import { loadQuestions } from '#lib/data.ts';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { CUSTOM_PREFIX, level, listCustomBanks, resolvePlayable } from '#lib/banks.ts';
+	import { importUrl } from '#lib/importer.ts';
+	import { loadSettings, saveSettings } from '#lib/progress.ts';
 	import { Game, TIMING } from '#lib/game.svelte.ts';
 	import { MAX_HP } from '#lib/modes.ts';
 	import type { Direction, Question } from '#lib/types.ts';
@@ -70,6 +75,10 @@
 			if (!e.repeat) game.toggleSound();
 			return;
 		}
+		if (game.phase === 'card' && !game.mode && !e.repeat && (e.code === 'KeyB' || e.code === 'KeyP')) {
+			goto(resolve(e.code === 'KeyB' ? '/banks' : '/profile'));
+			return;
+		}
 		if (e.code === 'Escape') {
 			if (!e.repeat) game.quit();
 			return;
@@ -82,6 +91,27 @@
 		game.press(direction, e.timeStamp);
 	}
 
+	let shareError = $state('');
+
+	/** Load the selected bank; a `?bank=<url>` link imports and selects that bank first. */
+	async function start() {
+		const settings = loadSettings();
+		const shared = new URL(location.href).searchParams.get('bank');
+		if (shared) {
+			try {
+				const { bank } = await importUrl(shared, await listCustomBanks());
+				settings.bank = CUSTOM_PREFIX + bank.id;
+				saveSettings(settings);
+			} catch (error) {
+				shareError = `The shared bank could not be loaded: ${(error as Error).message}`;
+			}
+			history.replaceState(history.state, '', resolve('/'));
+		}
+		const playable = await resolvePlayable(settings.bank, settings.level);
+		const label = playable.levelled ? `${playable.name} · ${level(settings.level).label}` : playable.name;
+		game.load(playable.questions, { id: settings.bank, label });
+	}
+
 	function percent(x: number | null) {
 		return x === null ? '—' : `${Math.round(x * 100)}%`;
 	}
@@ -91,11 +121,8 @@
 	}
 
 	onMount(() => {
-		loadQuestions().then(
-			(questions) => {
-				game.load(questions);
-				requestAnimationFrame(() => requestAnimationFrame(() => (settled = true)));
-			},
+		start().then(
+			() => requestAnimationFrame(() => requestAnimationFrame(() => (settled = true))),
 			(error) => {
 				console.error(error);
 				game.fail();
@@ -119,10 +146,7 @@
 	const outcome = $derived(line?.result?.outcome);
 </script>
 
-<svelte:head>
-	<title>Lexical Flow</title>
-	<meta name="description" content="A continuous stream of sentences. Pick the missing word, instinctively." />
-</svelte:head>
+<Seo path="/" app />
 
 <svelte:window {onkeydown} bind:innerHeight={viewport} />
 
@@ -190,6 +214,8 @@
 		</div>
 	{/if}
 
+	{#if shareError}<p class="share-error" role="alert">{shareError}</p>{/if}
+
 	<footer class="hud">
 		<span class="stats" aria-label="Progress">
 			{#if game.mode}
@@ -211,16 +237,22 @@
 				<span title="Questions">{run.count}{game.mode.limit ? ` / ${game.mode.limit}` : ''}</span>
 				<span title="Run score">{run.score.toLocaleString('en-US')} pts</span>
 				{#if game.phase !== 'card'}<span class="quit">Esc to quit</span>{/if}
-			{:else if game.summary.attempted}
-				<span title="All-time questions">{game.summary.attempted.toLocaleString('en-US')} answered</span>
-				<span title="Accuracy">{percent(game.summary.accuracy)}</span>
-				<span title="Average response time">{seconds(game.summary.averageMs)}</span>
-				<span title="All-time score">{game.summary.totalScore.toLocaleString('en-US')} pts</span>
+			{:else if game.phase !== 'loading'}
+				<nav class="links">
+					<a href={resolve('/banks')}>Word bank <kbd>B</kbd></a>
+					<a href={resolve('/profile')}>Profile <kbd>P</kbd></a>
+				</nav>
+			{/if}
+			{#if !game.mode && game.summary.attempted}
+				<span class="summary" title="All-time questions">{game.summary.attempted.toLocaleString('en-US')} answered</span>
+				<span class="summary" title="Accuracy">{percent(game.summary.accuracy)}</span>
+				<span class="summary" title="Average response time">{seconds(game.summary.averageMs)}</span>
+				<span class="summary" title="All-time score">{game.summary.totalScore.toLocaleString('en-US')} pts</span>
 			{/if}
 		</span>
 		{#if !game.mode}
 			<a class="credit" href="https://tatoeba.org" target="_blank" rel="noreferrer" onpointerdown={(e) => e.stopPropagation()}>
-				Sentences from Tatoeba (CC BY 2.0 FR) and WordNet
+				<span class="wide">Sentences from </span>Tatoeba (CC BY 2.0 FR)<span class="wide"> and WordNet</span>
 			</a>
 		{/if}
 		<button
@@ -399,6 +431,57 @@
 			opacity: 0;
 			transform: translateY(-0.6rem);
 		}
+	}
+
+	.links {
+		display: flex;
+		gap: 1.25rem;
+	}
+
+	.links a {
+		color: var(--ink);
+		opacity: 0.7;
+		text-decoration: none;
+		font-weight: 600;
+		transition: opacity 150ms ease;
+	}
+
+	.links a:hover {
+		opacity: 1;
+	}
+
+	.links kbd {
+		font-size: 0.85em;
+		opacity: 0.7;
+		margin-left: 0.2em;
+	}
+
+	.links a {
+		white-space: nowrap;
+	}
+
+	@media (max-width: 640px) {
+		.hud {
+			gap: 0.75rem;
+			font-size: 0.75rem;
+		}
+
+		.links kbd,
+		.wide,
+		.quit,
+		.summary {
+			display: none;
+		}
+	}
+
+	.share-error {
+		position: absolute;
+		top: 1rem;
+		left: max(1.5rem, calc((100vw - 58rem) / 2));
+		right: 1.5rem;
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--negative);
 	}
 
 	.credit {

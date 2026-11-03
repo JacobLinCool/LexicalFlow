@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<style>
+			* {
+				box-sizing: border-box;
+			}
+			html,
+			body {
+				margin: 0;
+				width: 1200px;
+				height: 630px;
+				overflow: hidden;
+				background: #1a1c24;
+				color: #fff;
+				font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui,
+					sans-serif;
+				-webkit-font-smoothing: antialiased;
+			}
+			.field {
+				position: absolute;
+				border-radius: 50%;
+				filter: blur(70px);
+			}
+			.a {
+				width: 820px;
+				height: 820px;
+				left: -260px;
+				top: -380px;
+				background: radial-gradient(circle, #24566a 0%, transparent 68%);
+			}
+			.b {
+				width: 900px;
+				height: 900px;
+				right: -320px;
+				bottom: -480px;
+				background: radial-gradient(circle, #6a3f5e 0%, transparent 68%);
+			}
+			.c {
+				width: 640px;
+				height: 640px;
+				left: 420px;
+				top: 60px;
+				background: radial-gradient(circle, #3b4f86 0%, transparent 68%);
+				opacity: 0.8;
+			}
+			.veil {
+				position: absolute;
+				inset: 0;
+				background: radial-gradient(ellipse at 30% 35%, transparent 0%, rgb(12 13 18 / 0.5) 100%);
+			}
+			.stage {
+				position: absolute;
+				inset: 0;
+				padding: 0 88px;
+			}
+			.line {
+				position: absolute;
+				left: 88px;
+				width: 720px;
+				margin: 0;
+				font-size: 56px;
+				white-space: nowrap;
+				line-height: 1.14;
+				font-weight: 700;
+				letter-spacing: -0.024em;
+			}
+			.past {
+				top: 70px;
+				opacity: 0.3;
+				filter: blur(1.2px);
+			}
+			.past .word {
+				color: #8fe3b4;
+			}
+			.current {
+				top: 172px;
+			}
+			.future {
+				top: 498px;
+				opacity: 0.26;
+				filter: blur(3.5px);
+			}
+			.gap {
+				position: relative;
+				display: inline-block;
+				width: 3em;
+				height: 0.1em;
+				border-radius: 999px;
+				background: rgb(255 255 255 / 0.3);
+				vertical-align: 0.02em;
+				overflow: hidden;
+			}
+			.gap::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+				background: #fff;
+				transform: scaleX(0.62);
+				transform-origin: left;
+			}
+			.choices {
+				position: absolute;
+				left: 88px;
+				top: 262px;
+				display: grid;
+				grid-template-columns: repeat(3, auto);
+				grid-template-areas:
+					'. up .'
+					'left . right'
+					'. down .';
+				gap: 8px 12px;
+				font-size: 21px;
+			}
+			.choice {
+				display: inline-flex;
+				align-items: baseline;
+				justify-content: center;
+				gap: 0.5em;
+				min-width: 7.2em;
+				padding: 0.42em 1em;
+				border-radius: 1em;
+				font-weight: 600;
+				background: rgb(255 255 255 / 0.08);
+				box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.11);
+			}
+			.choice .arrow {
+				font-size: 0.75em;
+				opacity: 0.45;
+				font-weight: 500;
+			}
+			.up {
+				grid-area: up;
+			}
+			.left {
+				grid-area: left;
+			}
+			.down {
+				grid-area: down;
+			}
+			.right {
+				grid-area: right;
+			}
+			.brand {
+				position: absolute;
+				right: 88px;
+				top: 236px;
+				text-align: right;
+			}
+			.brand h1 {
+				margin: 0;
+				font-size: 44px;
+				font-weight: 800;
+				letter-spacing: -0.03em;
+			}
+			.brand p {
+				margin: 10px 0 0;
+				font-size: 21px;
+				font-weight: 500;
+				opacity: 0.6;
+				line-height: 1.4;
+			}
+			.mark {
+				display: inline-block;
+				width: 40px;
+				height: 40px;
+				margin-bottom: 14px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="field a"></div>
+		<div class="field b"></div>
+		<div class="field c"></div>
+		<div class="veil"></div>
+
+		<p class="line past">Our flight was <span class="word">delayed</span> again.</p>
+		<p class="line current">Could you <span class="gap"></span> me the way?</p>
+
+		<div class="choices">
+			<span class="choice up"><span class="arrow">↑</span>show</span>
+			<span class="choice left"><span class="arrow">←</span>talk</span>
+			<span class="choice right"><span class="arrow">→</span>say</span>
+			<span class="choice down"><span class="arrow">↓</span>speak</span>
+		</div>
+
+		<div class="brand">
+			<img class="mark" src="icon.svg" alt="" />
+			<h1>Lexical Flow</h1>
+			<p>Pick the missing word<br />before the line runs out.</p>
+		</div>
+
+		<p class="line future">The results suggest it works.</p>
+	</body>
+</html>

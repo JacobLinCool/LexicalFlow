@@ -31,6 +31,10 @@ export class Deck {
 		this.recent = recent.slice(-RECENT_IDS);
 	}
 
+	get size(): number {
+		return this.#questions.length;
+	}
+
 	next(): Question {
 		const n = this.#questions.length;
 		const idWindow = Math.min(RECENT_IDS, Math.floor(n / 2));

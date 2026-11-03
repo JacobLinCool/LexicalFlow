@@ -24,13 +24,17 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - id: pages
+        uses: actions/configure-pages@v5
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm test
       - run: pnpm build
         env:
-          # Project pages live under /<repo>; a user/org site (<name>.github.io) lives at the root.
-          BASE_PATH: ${{ endsWith(github.event.repository.name, '.github.io') && '' || format('/{0}', github.event.repository.name) }}
+          # e.g. base_path "/LexicalFlow" and base_url "https://user.github.io/LexicalFlow";
+          # both follow a custom domain or a <user>.github.io repository automatically.
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build

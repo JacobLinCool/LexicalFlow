@@ -1,3 +1,4 @@
+import type { LevelId } from './banks';
 import type { ModeId } from './modes';
 import type { Outcome, Question, Result } from './types';
 
@@ -20,7 +21,36 @@ export interface Progress {
 	recent: string[];
 	/** Highest-scoring completed run per mode. */
 	bests: Partial<Record<ModeId, Best>>;
+	/** Epoch ms of the first recorded answer. */
+	since: number | null;
+	/** Tallies by question category (custom banks may add their own keys). */
+	categories: Record<string, Tally>;
+	/** Tallies by difficulty level, keyed "1".."5". */
+	levels: Record<string, Tally>;
+	/** Tallies by local calendar day, keyed YYYY-MM-DD. */
+	days: Record<string, Tally>;
+	/** Response-time histogram of answered questions, in half-second bins over 0–5 s. */
+	times: number[];
+	/** Completed runs, newest last, capped at RUN_HISTORY. */
+	runs: RunRecord[];
 }
+
+/** [attempts, correct, timedOut, answerMs (answered only), score]. */
+export type Tally = [number, number, number, number, number];
+
+export interface RunRecord {
+	mode: ModeId;
+	bank: string;
+	score: number;
+	count: number;
+	correct: number;
+	answered: number;
+	answerMs: number;
+	at: number;
+}
+
+const RUN_HISTORY = 200;
+export const TIME_BINS = 10;
 
 export interface Best {
 	score: number;
@@ -32,6 +62,9 @@ export interface Best {
 
 export interface Settings {
 	sound: boolean;
+	/** Selected bank id: a built-in id ('all' or a category) or 'custom:<id>'. */
+	bank: string;
+	level: LevelId;
 }
 
 export function emptyProgress(): Progress {
@@ -44,7 +77,13 @@ export function emptyProgress(): Progress {
 		totalScore: 0,
 		words: {},
 		recent: [],
-		bests: {}
+		bests: {},
+		since: null,
+		categories: {},
+		levels: {},
+		days: {},
+		times: new Array(TIME_BINS).fill(0),
+		runs: []
 	};
 }
 
@@ -74,7 +113,7 @@ export function saveProgress(progress: Progress): void {
 }
 
 export function loadSettings(): Settings {
-	return { sound: false, ...read<Settings>(SETTINGS_KEY) };
+	return { sound: false, bank: 'all', level: 'medium', ...read<Settings>(SETTINGS_KEY) };
 }
 
 export function saveSettings(settings: Settings): void {
@@ -102,7 +141,43 @@ export function record(progress: Progress, question: Question, result: Result): 
 	if (result.outcome !== 'timeout') w[4] += Math.round(result.ms);
 	w[5] = Math.floor(Date.now() / 1000);
 	progress.words[question.lemma] = w;
+
+	const now = new Date();
+	progress.since ??= now.getTime();
+	tally(progress.categories, question.category, result);
+	tally(progress.levels, String(question.difficulty), result);
+	tally(progress.days, dayKey(now), result);
+	if (result.outcome !== 'timeout') {
+		const bin = Math.min(TIME_BINS - 1, Math.floor(result.ms / (5000 / TIME_BINS)));
+		progress.times[bin]++;
+	}
 	return progress;
+}
+
+function tally(map: Record<string, Tally>, key: string, result: Result): void {
+	const t: Tally = map[key] ?? [0, 0, 0, 0, 0];
+	t[0]++;
+	if (result.outcome === 'correct') t[1]++;
+	if (result.outcome === 'timeout') t[2]++;
+	else t[3] += Math.round(result.ms);
+	t[4] += result.score;
+	map[key] = t;
+}
+
+export function dayKey(date: Date): string {
+	const pad = (n: number) => String(n).padStart(2, '0');
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export function recordRun(progress: Progress, run: RunRecord): void {
+	progress.runs.push(run);
+	if (progress.runs.length > RUN_HISTORY) progress.runs.splice(0, progress.runs.length - RUN_HISTORY);
+}
+
+export function resetProgress(): Progress {
+	const fresh = emptyProgress();
+	saveProgress(fresh);
+	return fresh;
 }
 
 export function averageMs(progress: Progress): number | null {

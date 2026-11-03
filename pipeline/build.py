@@ -280,7 +280,11 @@ def main() -> None:
             "choices": {d: choices[d] for d in DIRECTIONS},
             "answer": ans_dir,
             "category": cat,
-            "difficulty": difficulty_for(it["zipf"]),
+            # A question is as hard as its rarest choice: an obscure distractor makes it
+            # feel hard even when the answer is common.
+            "difficulty": difficulty_for(
+                min([it["zipf"], *(zipf_frequency(w, "en") for w in it["chosen"])])
+            ),
             "lemma": it["lemma"],
         })
         lemma_pos[it["lemma"]][it["pos"]] += 1

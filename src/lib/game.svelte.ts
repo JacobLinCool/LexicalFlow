@@ -7,6 +7,7 @@ import {
 	loadSettings,
 	record,
 	recordBest,
+	recordRun,
 	saveProgress,
 	saveSettings
 } from './progress';
@@ -54,6 +55,8 @@ export interface Option {
 /** A non-question line in the stream: the mode menu or a run's results. */
 export interface Card {
 	title: string;
+	/** Current word bank, shown on the menu card. */
+	bank?: string;
 	subtitle?: string;
 	options: Partial<Record<Direction, Option>>;
 	act: (direction: Direction) => void;
@@ -109,6 +112,9 @@ export class Game {
 	sound = $state(false);
 	summary = $state<Summary>(summarize(loadProgress()));
 	mode = $state<Mode | null>(null);
+	/** What is being played, e.g. "Travel · Easy", shown on the menu. */
+	bankLabel = $state('');
+	#bankId = 'all';
 	run = $state<Run>(emptyRun());
 
 	#deck: Deck | null = null;
@@ -126,7 +132,9 @@ export class Game {
 		return this.lines[this.current];
 	}
 
-	load(questions: Question[]): void {
+	load(questions: Question[], bank: { id: string; label: string }): void {
+		this.bankLabel = bank.label;
+		this.#bankId = bank.id;
 		this.#deck = new Deck(questions, this.#progress.recent);
 		this.lines = [{ key: this.#nextKey++, card: this.#menuCard(), result: null }];
 		this.current = 0;
@@ -158,7 +166,7 @@ export class Game {
 	toggleSound(): void {
 		this.sound = !this.sound;
 		if (this.sound) sounds.prime();
-		saveSettings({ sound: this.sound });
+		saveSettings({ ...loadSettings(), sound: this.sound });
 	}
 
 	/** Persist now, e.g. when the page is being hidden. */
@@ -180,8 +188,10 @@ export class Game {
 				detail: best ? `${mode.detail} · best ${points(best.score)}` : mode.detail
 			};
 		}
+		const count = `${points(this.#deck?.size ?? 0)} questions`;
 		return {
 			title: 'Choose your flow.',
+			bank: `${this.bankLabel} · ${count}`,
 			subtitle: s.attempted
 				? `${points(s.attempted)} answered · ${Math.round((s.accuracy ?? 0) * 100)}% correct · ${((s.averageMs ?? 0) / 1000).toFixed(2)}s average`
 				: 'Pick the missing word before the line runs out.',
@@ -329,6 +339,16 @@ export class Game {
 		const over = !!mode && ((mode.limit !== null && run.count >= mode.limit) || (mode.hp && run.hp <= 0));
 		let newBest = false;
 		if (over && mode) {
+			recordRun(this.#progress, {
+				mode: mode.id,
+				bank: this.#bankId,
+				score: run.score,
+				count: run.count,
+				correct: run.correct,
+				answered: run.answered,
+				answerMs: Math.round(run.answerMs),
+				at: Date.now()
+			});
 			newBest = recordBest(this.#progress, mode.id, {
 				score: run.score,
 				correct: run.correct,

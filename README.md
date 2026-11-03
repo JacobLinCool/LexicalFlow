@@ -39,6 +39,31 @@ runs show a results line in the stream, and the best score per mode is kept.
 Progress (attempts, correct / incorrect / timed out, average response time, total score and per-word
 results) is stored in `localStorage` and survives reloads.
 
+## Word banks
+
+`B` on the menu opens the word bank page (`/banks`):
+
+- **Difficulty**: Easy, Medium, Hard or All. A question is as hard as its rarest choice, so Easy keeps
+  every option to everyday words.
+- **Topics**: all, conversation, travel, networking or academic.
+- **Your own banks**, imported from a link, a file or pasted text, and stored in IndexedDB:
+  - Questions as CSV: `sentence,answer,distractor1,distractor2,distractor3` (plus optional `category`,
+    `difficulty`), with `___` marking the blank.
+  - Questions as JSON: an array (or `{ "name", "questions" }`) of `{ sentence, answer, distractors }`
+    or the game's own `{ sentence, choices, answer }` shape.
+  - A word list (one per line, a `word` column, or a JSON array of strings), which plays the built-in
+    sentences for those words.
+
+  Links must allow cross-origin requests; GitHub page links and Google Sheets links are converted to
+  their raw/CSV forms automatically. Sharing `https://<site>/?bank=<file URL>` imports and selects the
+  bank for whoever opens it.
+
+## Profile
+
+`P` on the menu opens `/profile`: totals, best runs, accuracy and points by topic (radar), accuracy
+by word level, response-time distribution, daily activity, recent run trend, and the words that need
+practice. It reads the same browser storage and can be reset there.
+
 ## Develop
 
 ```sh
@@ -54,9 +79,24 @@ The question bank under `static/data/` is generated offline; see [`pipeline/READ
 ## Deploy
 
 `.github/workflows/deploy.yml` builds and publishes to GitHub Pages on every push to `main`. In the
-repository settings, set **Pages → Source** to **GitHub Actions**. The workflow sets `BASE_PATH` to
-`/<repo>` (or the root for a `<user>.github.io` repository); to build for a sub-path locally, run
-`BASE_PATH=/LexicalFlow pnpm build`.
+repository settings, set **Pages → Source** to **GitHub Actions**. The workflow reads the site's
+address from `actions/configure-pages` and passes it to the build as `BASE_PATH` (e.g. `/LexicalFlow`)
+and `SITE_URL` (e.g. `https://jacoblincool.github.io/LexicalFlow`); both follow a custom domain
+automatically. To build for a sub-path locally:
+
+```sh
+BASE_PATH=/LexicalFlow SITE_URL=https://jacoblincool.github.io/LexicalFlow pnpm build
+```
+
+`SITE_URL` is used for canonical links, Open Graph and Twitter cards, `sitemap.xml` and the
+`Sitemap:` line in `robots.txt`. Without it the site still works; those absolute URLs are simply
+left out.
 
 A service worker caches the app shell on first load and the question bank as it is fetched, so the
 game keeps working offline afterwards.
+
+The share image (`static/og.png`) and app icons are rendered from `scripts/og/`:
+
+```sh
+npm i --no-save playwright && npx playwright install chromium && node scripts/og/render.mjs
+```

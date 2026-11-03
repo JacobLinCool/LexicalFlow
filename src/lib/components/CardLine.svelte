@@ -5,6 +5,7 @@
 </script>
 
 <div class="card">
+	{#if card.bank}<p class="bank">{card.bank}</p>{/if}
 	<p class="title">{card.title}</p>
 	{#if card.subtitle}<p class="subtitle">{card.subtitle}</p>{/if}
 </div>
@@ -16,6 +17,15 @@
 		line-height: 1.16;
 		font-weight: 700;
 		letter-spacing: -0.022em;
+	}
+
+	.bank {
+		margin: 0 0 0.4rem;
+		font-size: 0.8rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		opacity: 0.55;
 	}
 
 	.subtitle {

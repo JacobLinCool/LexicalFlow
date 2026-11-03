@@ -164,6 +164,25 @@
 		opacity: 0.35;
 	}
 
+	@media (max-width: 640px) {
+		.choices {
+			gap: 0.4rem;
+		}
+
+		.rich {
+			min-width: 0;
+			padding: 0.55em 0.8em;
+		}
+
+		.rich .arrow {
+			display: none;
+		}
+
+		.label small {
+			font-size: 0.62em;
+		}
+	}
+
 	@keyframes flash-positive {
 		from {
 			background: var(--positive);

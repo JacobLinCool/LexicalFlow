@@ -13,6 +13,7 @@
 	import { loadSettings, saveSettings } from '#lib/progress.ts';
 	import { Game, TIMING } from '#lib/game.svelte.ts';
 	import { MAX_HP } from '#lib/modes.ts';
+	import { RESPONSE_WINDOW_MS } from '#lib/scoring.ts';
 	import type { Direction, Question } from '#lib/types.ts';
 
 	const KEYS: Record<string, Direction> = {
@@ -155,6 +156,7 @@
 <main
 	class="stage"
 	style:--scroll-ms="{TIMING.scroll}ms"
+	style:--window="{RESPONSE_WINDOW_MS}ms"
 	onpointerdown={(e) => game.phase === 'idle' && game.press('up', e.timeStamp)}
 >
 	{#if game.phase === 'loading'}

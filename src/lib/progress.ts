@@ -1,5 +1,6 @@
 import type { LevelId } from './banks';
 import type { ModeId } from './modes';
+import { RESPONSE_WINDOW_MS } from './scoring';
 import type { Outcome, Question, Result } from './types';
 
 const PROGRESS_KEY = 'lexical-flow:progress:v1';
@@ -29,7 +30,7 @@ export interface Progress {
 	levels: Record<string, Tally>;
 	/** Tallies by local calendar day, keyed YYYY-MM-DD. */
 	days: Record<string, Tally>;
-	/** Response-time histogram of answered questions, in half-second bins over 0–5 s. */
+	/** Response-time histogram of answered questions, in half-second bins over the response window. */
 	times: number[];
 	/** Completed runs, newest last, capped at RUN_HISTORY. */
 	runs: RunRecord[];
@@ -50,7 +51,7 @@ export interface RunRecord {
 }
 
 const RUN_HISTORY = 200;
-export const TIME_BINS = 10;
+export const TIME_BINS = RESPONSE_WINDOW_MS / 500;
 
 export interface Best {
 	score: number;
@@ -148,7 +149,9 @@ export function record(progress: Progress, question: Question, result: Result): 
 	tally(progress.levels, String(question.difficulty), result);
 	tally(progress.days, dayKey(now), result);
 	if (result.outcome !== 'timeout') {
-		const bin = Math.min(TIME_BINS - 1, Math.floor(result.ms / (5000 / TIME_BINS)));
+		// Saves from the 5 s era hold fewer bins; extend them.
+		while (progress.times.length < TIME_BINS) progress.times.push(0);
+		const bin = Math.min(TIME_BINS - 1, Math.floor(result.ms / 500));
 		progress.times[bin]++;
 	}
 	return progress;

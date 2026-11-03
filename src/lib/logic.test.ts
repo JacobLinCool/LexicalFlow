@@ -22,11 +22,11 @@ describe('score', () => {
 		expect(score(true, 0)).toBe(100);
 		expect(score(true, 1000)).toBe(100);
 	});
-	it('decays linearly to zero at five seconds', () => {
-		expect(score(true, 3000)).toBe(50);
-		expect(score(true, 2000)).toBe(75);
-		expect(score(true, 4999)).toBe(0);
-		expect(score(true, 5000)).toBe(0);
+	it('decays linearly to zero at ten seconds', () => {
+		expect(score(true, 5500)).toBe(50);
+		expect(score(true, 2800)).toBe(80);
+		expect(score(true, 9999)).toBe(0);
+		expect(score(true, 10_000)).toBe(0);
 	});
 	it('gives nothing for a wrong answer', () => {
 		expect(score(false, 200)).toBe(0);

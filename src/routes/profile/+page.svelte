@@ -46,7 +46,7 @@
 			.sort((a, b) => a.accuracy - b.accuracy || b.attempts - a.attempts)
 			.slice(0, 12);
 		const strongest = [...mastered]
-			.sort((a, b) => b.accuracy - a.accuracy || (a.avgMs ?? 5000) - (b.avgMs ?? 5000))
+			.sort((a, b) => b.accuracy - a.accuracy || (a.avgMs ?? Infinity) - (b.avgMs ?? Infinity))
 			.slice(0, 12);
 
 		const categories = CATEGORIES.map((c) => ({ name: title(c), ...rates(p.categories[c]) }));
@@ -169,7 +169,7 @@
 				<h2 class="spaced">Response time</h2>
 				<Bars
 					label="Number of answers by response time"
-					bars={p.times.slice(0, TIME_BINS).map((count, i) => ({
+					bars={Array.from({ length: TIME_BINS }, (_, i) => p.times[i] ?? 0).map((count, i) => ({
 						label: `${(i * 0.5).toFixed(1)}s`,
 						value: count,
 						tip: `${n(count)} answered in ${(i * 0.5).toFixed(1)}–${((i + 1) * 0.5).toFixed(1)}s`

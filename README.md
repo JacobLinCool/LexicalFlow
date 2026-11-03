@@ -28,11 +28,11 @@ In Survival a correct answer heals a tenth of its score (up to 10 HP at full spe
 answer or timeout costs 20 HP, rising by 5 every 25 questions so every run eventually ends. Finished
 runs show a results line in the stream, and the best score per mode is kept.
 
-- Every question has a strict five-second window. The clock starts only after the sentence has scrolled
+- Every question has a strict ten-second window. The clock starts only after the sentence has scrolled
   into place and its choices are visible; feedback and scrolling never eat into it.
 - The first direction pressed is final. Held keys and auto-repeat never answer a second question.
-- Scoring: a correct answer within one second earns 100 points, then decays linearly to 0 at five
-  seconds (`25 × (5 − t)`). Wrong answers and timeouts score 0. There are no combos.
+- Scoring: a correct answer within one second earns 100 points, then decays linearly to 0 at ten
+  seconds (`100 × (10 − t) / 9`). Wrong answers and timeouts score 0. There are no combos.
 - After three consecutive timeouts, or when the tab is hidden, the stream waits on the next sentence
   until you press a direction again. Questions themselves are never paused or replayed.
 

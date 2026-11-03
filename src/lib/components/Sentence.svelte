@@ -62,7 +62,8 @@
 		color: var(--negative);
 	}
 
-	/* The underline drains over the five-second window; its last second warms up. */
+	/* The underline drains over the response window (--window); its last second (90–100% of
+	   a 10 s window) warms up. */
 	.timer {
 		position: absolute;
 		inset: 0;
@@ -70,8 +71,8 @@
 		background: var(--ink);
 		transform-origin: left center;
 		animation:
-			drain 5s linear forwards,
-			urgency 5s linear forwards;
+			drain var(--window) linear forwards,
+			urgency var(--window) linear forwards;
 	}
 
 	.timer.stopped {
@@ -89,20 +90,20 @@
 
 	@keyframes urgency {
 		0%,
-		80% {
+		90% {
 			background: var(--ink);
 			opacity: 0.9;
 			box-shadow: none;
 		}
-		85% {
+		92.5% {
 			background: var(--urgent);
 			opacity: 1;
 			box-shadow: 0 0 0.5em var(--urgent);
 		}
-		90% {
+		95% {
 			opacity: 0.55;
 		}
-		95% {
+		97.5% {
 			opacity: 1;
 		}
 		100% {

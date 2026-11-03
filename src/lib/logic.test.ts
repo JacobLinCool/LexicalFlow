@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Deck } from './deck';
+import { readingMs } from './game.svelte';
 import { damage, heal, hpDelta } from './modes';
 import { averageMs, emptyProgress, record, recordBest } from './progress';
 import { score } from './scoring';
@@ -30,6 +31,13 @@ describe('score', () => {
 	});
 	it('gives nothing for a wrong answer', () => {
 		expect(score(false, 200)).toBe(0);
+	});
+});
+
+describe('readingMs', () => {
+	it('allows 200 ms per word at 300 WPM, counting the blank', () => {
+		expect(readingMs('The results ___ that the method is effective.')).toBe(1600);
+		expect(readingMs('  Hi   ___ ')).toBe(400);
 	});
 });
 

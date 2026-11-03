@@ -6,31 +6,42 @@ import { self } from '$app/service-worker';
 import { assets, immutable, prerendered } from '$app/manifest';
 import { version } from '$app/env';
 
-// The app shell is cached up front; the question bank is cached as it is fetched,
-// so a second visit works fully offline.
+// Strategy:
+// - _app/immutable/* is content-hashed: cache-first.
+// - Pages and other static files: network-first, so a deploy is picked up on the next load;
+//   the cache is only the offline fallback.
+// - The question bank: versioned files cache-first, the manifest network-first (see data()).
+// Everything is fetched past the browser's HTTP cache when stored, because GitHub Pages lets
+// HTML sit in it for ten minutes and a stale page would point at chunks that no longer exist.
 const SHELL = `shell-${version}`;
 const DATA = 'data-v1';
 
 const base = new URL(self.registration.scope).pathname;
-// cache.addAll rejects duplicate entries, hence the Set.
+const local = (p: string) => base + p.replace(/^\//, '');
+const hashed = new Set(immutable.map((f) => local(f.path)));
+const pages = new Set(prerendered.map((f) => local(f.path)).concat(base));
 const shell = [
-	...new Set(
-		[
-			...immutable.map((f) => f.path),
-			...assets.map((f) => f.path).filter((p) => !p.startsWith('data/') && !p.startsWith('.')),
-			...prerendered.map((f) => f.path),
-			''
-		].map((p) => base + p.replace(/^\//, ''))
-	)
+	...new Set([
+		...hashed,
+		...pages,
+		...assets.map((f) => f.path).filter((p) => !p.startsWith('data/') && !p.startsWith('.')).map(local)
+	])
 ];
 
 self.addEventListener('install', (event) => {
-	event.waitUntil(
-		Promise.all([caches.open(SHELL).then((cache) => cache.addAll(shell)), precacheBank()]).then(() =>
-			self.skipWaiting()
-		)
-	);
+	event.waitUntil(Promise.all([precacheShell(), precacheBank()]).then(() => self.skipWaiting()));
 });
+
+/** Cache each file on its own, so one failed request cannot block the whole install. */
+async function precacheShell(): Promise<void> {
+	const cache = await caches.open(SHELL);
+	await Promise.allSettled(
+		shell.map(async (path) => {
+			const res = await fetch(path, { cache: hashed.has(path) ? 'default' : 'reload' });
+			if (res.ok) await cache.put(path, res);
+		})
+	);
+}
 
 /**
  * The first visit fetches the bank before this worker controls the page, so cache it here
@@ -52,8 +63,10 @@ async function precacheBank(): Promise<void> {
 			Object.values(manifest.categories).map(async ({ file }) => {
 				const url = `${base}data/${file}?v=${v}`;
 				if (await cache.match(url)) return;
+				const fresh = await fetch(url, { cache: 'reload' });
+				if (!fresh.ok) return;
 				for (const old of await cache.keys(url, { ignoreSearch: true })) await cache.delete(old);
-				await cache.add(url);
+				await cache.put(url, fresh);
 			})
 		);
 	} catch {
@@ -76,16 +89,40 @@ self.addEventListener('fetch', (event) => {
 	const request = event.request;
 	if (request.method !== 'GET') return;
 	const url = new URL(request.url);
-	if (url.origin !== self.location.origin) return;
+	if (url.origin !== self.location.origin || !url.pathname.startsWith(base)) return;
 
 	if (url.pathname.startsWith(`${base}data/`)) {
 		event.respondWith(data(request, url));
-		return;
-	}
-	if (shell.includes(url.pathname)) {
-		event.respondWith(caches.match(request).then((hit) => hit ?? fetch(request)));
+	} else if (hashed.has(url.pathname)) {
+		event.respondWith(cacheFirst(request));
+	} else if (request.mode === 'navigate' || shell.includes(url.pathname)) {
+		event.respondWith(networkFirst(request, url));
 	}
 });
+
+async function cacheFirst(request: Request): Promise<Response> {
+	const hit = await caches.match(request);
+	if (hit) return hit;
+	const res = await fetch(request);
+	if (res.ok) (await caches.open(SHELL)).put(request, res.clone());
+	return res;
+}
+
+/** Fresh from the network (revalidated past the HTTP cache); the cached copy only when offline. */
+async function networkFirst(request: Request, url: URL): Promise<Response> {
+	const cache = await caches.open(SHELL);
+	// Pages are cached by path: ?bank=… links and the like share the page's entry.
+	const key = url.pathname;
+	try {
+		const res = await fetch(request.mode === 'navigate' ? url.href : request, { cache: 'no-cache' });
+		if (res.ok && shell.includes(key)) await cache.put(key, res.clone());
+		return res;
+	} catch (error) {
+		const hit = (await cache.match(key)) ?? (request.mode === 'navigate' ? await cache.match(base) : undefined);
+		if (hit) return hit;
+		throw error;
+	}
+}
 
 /** Bank files carry a version query: serve those cache-first. The manifest goes network-first. */
 async function data(request: Request, url: URL): Promise<Response> {
@@ -93,7 +130,7 @@ async function data(request: Request, url: URL): Promise<Response> {
 	if (url.searchParams.has('v')) {
 		const hit = await cache.match(request);
 		if (hit) return hit;
-		const res = await fetch(request);
+		const res = await fetch(request, { cache: 'reload' });
 		if (res.ok) {
 			// Drop superseded versions of this file before storing the new one.
 			for (const old of await cache.keys(request, { ignoreSearch: true })) await cache.delete(old);
@@ -102,7 +139,7 @@ async function data(request: Request, url: URL): Promise<Response> {
 		return res;
 	}
 	try {
-		const res = await fetch(request);
+		const res = await fetch(request, { cache: 'no-cache' });
 		if (res.ok) await cache.put(request, res.clone());
 		return res;
 	} catch (error) {

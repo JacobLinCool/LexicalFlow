@@ -15,6 +15,8 @@
 
 	const ARROWS: Record<Direction, string> = { up: '↑', left: '←', down: '↓', right: '→' };
 	const ready = $derived(phase === 'active' || phase === 'card');
+	/** A question's choices stay hidden until its sentence has been read. */
+	const concealed = $derived(answer !== undefined && (phase === 'entering' || phase === 'reading'));
 	/** Up/down-only cards stack in one column instead of leaving the side cells empty. */
 	const vertical = $derived(!options.left && !options.right);
 
@@ -27,7 +29,7 @@
 	}
 </script>
 
-<div class="choices" class:ready class:vertical role="group" aria-label="Choices">
+<div class="choices" class:ready class:vertical class:concealed aria-hidden={concealed} role="group" aria-label="Choices">
 	{#each DIRECTIONS as direction (direction)}
 		{@const option = options[direction]}
 		{#if option}
@@ -62,6 +64,18 @@
 		justify-content: start;
 		gap: 0.5rem 0.75rem;
 		font-size: var(--choice-size);
+	}
+
+	.choices {
+		transition:
+			opacity 160ms ease,
+			transform 160ms ease;
+	}
+
+	.concealed {
+		opacity: 0;
+		transform: translateY(6px);
+		pointer-events: none;
 	}
 
 	.vertical {

@@ -9,12 +9,12 @@ read by the app (`static/data/manifest.json`, `questions/<category>.json`,
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import random
 import re
 from collections import Counter, defaultdict
-from datetime import date
 from functools import lru_cache
 
 import numpy as np
@@ -305,12 +305,17 @@ def main() -> None:
 
     (OUT / "questions").mkdir(parents=True, exist_ok=True)
     dump = lambda obj: json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+    # The version is a hash of the bank's content: clients cache bank files by it, so it must
+    # change whenever (and only when) the questions do.
+    digest = hashlib.sha256()
     for cat, qs in questions.items():
         qs.sort(key=lambda q: q["id"])
-        (OUT / "questions" / f"{cat}.json").write_text(dump(qs), encoding="utf-8")
+        text = dump(qs)
+        digest.update(text.encode("utf-8"))
+        (OUT / "questions" / f"{cat}.json").write_text(text, encoding="utf-8")
     (OUT / "vocabulary.json").write_text(dump({"count": len(entries), "entries": entries}), encoding="utf-8")
     manifest = {
-        "version": date.today().isoformat(),
+        "version": digest.hexdigest()[:12],
         "questionCount": len(kept),
         "vocabularyCount": len(entries),
         "categories": {c: {"file": f"questions/{c}.json", "count": len(questions[c])} for c in CATEGORIES},

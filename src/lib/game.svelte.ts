@@ -24,6 +24,15 @@ export const TIMING = {
 	scroll: 320
 } as const;
 
+/** Native-speaker reading pace; choices wait until the sentence could have been read. */
+export const READING_WPM = 300;
+
+/** Time to read a sentence at READING_WPM, counting the blank as a word. */
+export function readingMs(sentence: string): number {
+	const words = sentence.trim().split(/\s+/).filter(Boolean).length;
+	return Math.round((words * 60_000) / READING_WPM);
+}
+
 /** Sentences kept ready below the current one. */
 const LOOKAHEAD = 5;
 /** Lines kept above the current one before old history is dropped. */
@@ -40,6 +49,8 @@ export type Phase =
 	| 'idle'
 	/** Scrolling the next line into place; input ignored, clock not running. */
 	| 'entering'
+	/** Sentence in place, choices still hidden while it is read; clock not running. */
+	| 'reading'
 	/** Clock running; the first direction pressed is final. */
 	| 'active'
 	/** Selection highlight before the verdict (or before a card option acts). */
@@ -311,11 +322,18 @@ export class Game {
 				this.phase = 'card';
 				return;
 			}
-			this.phase = 'active';
-			this.#activatedAt = performance.now();
-			this.#timer = setTimeout(() => this.#resolve(null, RESPONSE_WINDOW_MS), RESPONSE_WINDOW_MS);
-			if (this.demo) this.#autoplay();
+			const question = this.line?.question;
+			this.phase = 'reading';
+			this.#timer = setTimeout(() => this.#activate(), question ? readingMs(question.sentence) : 0);
 		}, TIMING.scroll);
+	}
+
+	/** Reveal the choices and start the clock. */
+	#activate(): void {
+		this.phase = 'active';
+		this.#activatedAt = performance.now();
+		this.#timer = setTimeout(() => this.#resolve(null, RESPONSE_WINDOW_MS), RESPONSE_WINDOW_MS);
+		if (this.demo) this.#autoplay();
 	}
 
 	/** The demo player: a human-ish delay, usually right, sometimes not. */

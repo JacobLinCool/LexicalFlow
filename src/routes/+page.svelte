@@ -316,7 +316,7 @@
 
 	<p class="sr-only" aria-live="polite">
 		{#if outcome === 'correct'}Correct.{:else if outcome === 'incorrect'}Incorrect.{:else if outcome === 'timeout'}Time is up.{/if}
-		{#if game.phase === 'active' && line?.question}{line.question.sentence.replace('___', 'blank')}{/if}
+		{#if game.phase === 'reading' && line?.question}{line.question.sentence.replace('___', 'blank')}{/if}
 		{#if game.phase === 'card' && line?.card}{line.card.title} {line.card.subtitle}{/if}
 	</p>
 </main>

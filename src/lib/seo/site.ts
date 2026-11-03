@@ -2,7 +2,7 @@ declare const __SITE_URL__: string;
 
 export const SITE_NAME = 'Lexical Flow';
 export const SITE_DESCRIPTION =
-	'A lyrics-style vocabulary game: sentences stream past, each missing a word, and you pick it from four directions before the line runs out.';
+	'A minimalist vocabulary game: sentences stream past, each missing a word, and you pick it from four directions before the line runs out.';
 export const THEME_COLOR = '#1a1c24';
 
 /** Absolute site URL including the base path, without a trailing slash; empty when unset. */

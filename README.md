@@ -1,8 +1,8 @@
 # Lexical Flow
 
-A minimalist, lyrics-style vocabulary game that trains instant word choice. Sentences scroll past like
-synced lyrics; each one is missing a word, and you pick it from four directional choices before the
-clock runs out.
+A minimalist vocabulary game that trains instant word choice. Sentences scroll past in a continuous
+stream; each one is missing a word, and you pick it from four directional choices before the clock
+runs out.
 
 ## Play
 

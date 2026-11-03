@@ -1,7 +1,7 @@
 {
 	"name": "Lexical Flow",
 	"short_name": "Lexical Flow",
-	"description": "A lyrics-style vocabulary game: pick the missing word before the line runs out.",
+	"description": "A minimalist vocabulary game: pick the missing word before the line runs out.",
 	"start_url": "./",
 	"scope": "./",
 	"display": "standalone",

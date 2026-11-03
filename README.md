@@ -13,7 +13,9 @@ runs out.
 | `S` / `↓` | Down   |
 | `D` / `→` | Right  |
 
-`M` toggles sound and `Esc` abandons the current run. Choices can also be tapped or clicked.
+`M` toggles sound and `Esc` abandons the current run. `Space` starts or stops the demo, an
+autoplay that also starts after 30 seconds idle on the menu; any key or tap ends it, and nothing it
+plays is recorded. Choices can also be tapped or clicked.
 
 The stream opens on a mode menu, picked with the same directions:
 

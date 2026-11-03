@@ -1,6 +1,6 @@
 import type { Direction, Result } from './types';
 
-export type ModeId = 'quick' | 'standard' | 'survival' | 'practice';
+export type ModeId = 'quick' | 'standard' | 'survival' | 'practice' | 'demo';
 
 export interface Mode {
 	id: ModeId;
@@ -19,6 +19,12 @@ export const MODES: Mode[] = [
 	{ id: 'survival', label: 'Survival', detail: 'Endless, with HP', direction: 'right', limit: null, hp: true },
 	{ id: 'practice', label: 'Practice', detail: 'Endless, no stakes', direction: 'down', limit: null, hp: false }
 ];
+
+/** Autoplay attract mode: not on the menu, never recorded. */
+export const DEMO: Mode = { id: 'demo', label: 'Demo', detail: 'Autoplay', direction: 'down', limit: null, hp: false };
+
+/** How the demo player behaves: answer delay range (ms) and hit rate. */
+export const DEMO_PLAYER = { minMs: 700, maxMs: 3000, accuracy: 0.85 };
 
 export const MAX_HP = 100;
 

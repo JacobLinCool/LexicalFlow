@@ -1,5 +1,5 @@
 import { Deck } from './deck';
-import { MAX_HP, MODES, hpDelta } from './modes';
+import { DEMO, DEMO_PLAYER, MAX_HP, MODES, hpDelta } from './modes';
 import type { Mode } from './modes';
 import {
 	averageMs,
@@ -14,7 +14,7 @@ import {
 import type { Progress } from './progress';
 import { RESPONSE_WINDOW_MS, score } from './scoring';
 import { sounds } from './sound';
-import type { Direction, Question, Result } from './types';
+import { DIRECTIONS, type Direction, type Question, type Result } from './types';
 
 /** Animation timings (ms); none of them count against the response window. */
 export const TIMING = {
@@ -122,6 +122,8 @@ export class Game {
 	#nextKey = 0;
 	#activatedAt = 0;
 	#timer: ReturnType<typeof setTimeout> | undefined;
+	/** The demo player's pending answer. */
+	#bot: ReturnType<typeof setTimeout> | undefined;
 	#timeoutStreak = 0;
 
 	constructor() {
@@ -156,6 +158,29 @@ export class Game {
 		if (this.phase === 'card') return this.#choose(direction);
 	}
 
+	get demo(): boolean {
+		return this.mode?.id === 'demo';
+	}
+
+	/** Start autoplay, abandoning any run in progress. */
+	startDemo(): void {
+		if (this.demo || !this.#deck || this.phase === 'loading' || this.phase === 'error') return;
+		this.#stopTimers();
+		this.#start(DEMO);
+	}
+
+	/** Leave autoplay for the mode menu, whatever the demo was doing. */
+	stopDemo(): void {
+		if (!this.demo) return;
+		this.#stopTimers();
+		this.#showMenu();
+	}
+
+	#stopTimers(): void {
+		clearTimeout(this.#timer);
+		clearTimeout(this.#bot);
+	}
+
 	/** Abandon the current run (not recorded as a result) and return to the mode menu. */
 	quit(): void {
 		if (!this.mode || this.phase === 'locked' || this.phase === 'feedback') return;
@@ -175,7 +200,7 @@ export class Game {
 	}
 
 	destroy(): void {
-		clearTimeout(this.#timer);
+		this.#stopTimers();
 	}
 
 	#menuCard(): Card {
@@ -289,7 +314,18 @@ export class Game {
 			this.phase = 'active';
 			this.#activatedAt = performance.now();
 			this.#timer = setTimeout(() => this.#resolve(null, RESPONSE_WINDOW_MS), RESPONSE_WINDOW_MS);
+			if (this.demo) this.#autoplay();
 		}, TIMING.scroll);
+	}
+
+	/** The demo player: a human-ish delay, usually right, sometimes not. */
+	#autoplay(): void {
+		const question = this.line?.question;
+		if (!question) return;
+		const { minMs, maxMs, accuracy } = DEMO_PLAYER;
+		const wrong = DIRECTIONS.filter((d) => d !== question.answer);
+		const pick = Math.random() < accuracy ? question.answer : wrong[Math.floor(Math.random() * wrong.length)];
+		this.#bot = setTimeout(() => this.#answer(pick, performance.now()), minMs + Math.random() * (maxMs - minMs));
 	}
 
 	#answer(direction: Direction, at: number): void {
@@ -316,9 +352,12 @@ export class Game {
 		this.picked = picked;
 		this.phase = 'feedback';
 
-		record(this.#progress, question, result);
-		this.#progress.recent = this.#deck?.recent ?? [];
-		this.summary = summarize(this.#progress);
+		// The demo plays for show: nothing it does is recorded.
+		if (!this.demo) {
+			record(this.#progress, question, result);
+			this.#progress.recent = this.#deck?.recent ?? [];
+			this.summary = summarize(this.#progress);
+		}
 
 		const run = this.run;
 		if (this.mode?.hp) {
@@ -356,9 +395,9 @@ export class Game {
 				at: Date.now()
 			});
 		}
-		saveProgress(this.#progress);
+		if (!this.demo) saveProgress(this.#progress);
 
-		if (this.sound) sounds[result.outcome]();
+		if (this.sound && !this.demo) sounds[result.outcome]();
 		const hold = result.outcome === 'correct' ? TIMING.correct : TIMING.incorrect;
 		this.#timer = setTimeout(() => {
 			if (over && mode) this.#insertCard(this.#resultsCard(mode, newBest));

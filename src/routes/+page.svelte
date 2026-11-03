@@ -70,8 +70,34 @@
 		return `opacity:${opacity};filter:${blur ? `blur(${blur.toFixed(1)}px)` : 'none'};`;
 	}
 
+	/** Idle time on the mode menu before the demo starts by itself. */
+	const DEMO_AFTER_MS = 30_000;
+	let activity = $state(0);
+	const poke = () => activity++;
+
+	$effect(() => {
+		void activity;
+		if (game.phase !== 'card' || game.mode) return;
+		const timer = setTimeout(() => {
+			if (document.visibilityState === 'visible') game.startDemo();
+		}, DEMO_AFTER_MS);
+		return () => clearTimeout(timer);
+	});
+
 	function onkeydown(e: KeyboardEvent) {
+		poke();
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
+		// During the demo any key hands control back, and does nothing else.
+		if (game.demo) {
+			e.preventDefault();
+			if (!e.repeat) game.stopDemo();
+			return;
+		}
+		if (e.code === 'Space') {
+			e.preventDefault();
+			if (!e.repeat) game.startDemo();
+			return;
+		}
 		if (e.code === 'KeyM') {
 			if (!e.repeat) game.toggleSound();
 			return;
@@ -149,7 +175,7 @@
 
 <Seo path="/" app />
 
-<svelte:window {onkeydown} bind:innerHeight={viewport} />
+<svelte:window {onkeydown} onpointermove={poke} onpointerdown={poke} onwheel={poke} bind:innerHeight={viewport} />
 
 <Backdrop category={line?.question?.category} />
 
@@ -157,7 +183,10 @@
 	class="stage"
 	style:--scroll-ms="{TIMING.scroll}ms"
 	style:--window="{RESPONSE_WINDOW_MS}ms"
-	onpointerdown={(e) => game.phase === 'idle' && game.press('up', e.timeStamp)}
+	onpointerdown={(e) => {
+		if (game.demo) return game.stopDemo();
+		if (game.phase === 'idle') game.press('up', e.timeStamp);
+	}}
 >
 	{#if game.phase === 'loading'}
 		<p class="status" style:top="{anchor}px">Loading…</p>
@@ -206,7 +235,7 @@
 									answer={line.question?.answer}
 									phase={game.phase}
 									picked={game.picked}
-									onpick={(direction, at) => game.press(direction, at)}
+									onpick={(direction, at) => !game.demo && game.press(direction, at)}
 								/>
 							{/if}
 						</div>
@@ -238,11 +267,16 @@
 				{/if}
 				<span title="Questions">{run.count}{game.mode.limit ? ` / ${game.mode.limit}` : ''}</span>
 				<span title="Run score">{run.score.toLocaleString('en-US')} pts</span>
-				{#if game.phase !== 'card'}<span class="quit">Esc to quit</span>{/if}
+				{#if game.demo}
+					<span class="demo-hint">Press any key to play</span>
+				{:else if game.phase !== 'card'}
+					<span class="quit">Esc to quit</span>
+				{/if}
 			{:else if game.phase !== 'loading'}
 				<nav class="links">
 					<a href={resolve('/banks')}>Word bank <kbd>B</kbd></a>
 					<a href={resolve('/profile')}>Profile <kbd>P</kbd></a>
+					<button type="button" onpointerdown={(e) => (e.stopPropagation(), game.startDemo())}>Demo <kbd>Space</kbd></button>
 				</nav>
 			{/if}
 			{#if !game.mode && game.summary.attempted}
@@ -440,7 +474,12 @@
 		gap: 1.25rem;
 	}
 
-	.links a {
+	.links a,
+	.links button {
+		padding: 0;
+		font: inherit;
+		background: none;
+		cursor: pointer;
 		color: var(--ink);
 		opacity: 0.7;
 		text-decoration: none;
@@ -448,6 +487,19 @@
 		transition: opacity 150ms ease;
 	}
 
+	.demo-hint {
+		color: var(--ink);
+		opacity: 0.75;
+		animation: breathe 2.4s ease-in-out infinite;
+	}
+
+	@keyframes breathe {
+		50% {
+			opacity: 0.35;
+		}
+	}
+
+	.links button:hover,
 	.links a:hover {
 		opacity: 1;
 	}
@@ -458,7 +510,8 @@
 		margin-left: 0.2em;
 	}
 
-	.links a {
+	.links a,
+	.links button {
 		white-space: nowrap;
 	}
 

@@ -103,6 +103,7 @@
 		justify-content: center;
 		gap: 0.5em;
 		min-width: min(7.5em, 27vw);
+		max-width: 100%;
 		padding: 0.5em 1em;
 		border-radius: 1em;
 		font: inherit;
@@ -133,6 +134,13 @@
 		min-width: min(11em, 40vw);
 		padding: 0.6em 1.1em;
 		text-align: left;
+	}
+
+	/* Long words hyphenate instead of overflowing the button or the screen. */
+	.label {
+		min-width: 0;
+		overflow-wrap: anywhere;
+		hyphens: auto;
 	}
 
 	.label small {
@@ -183,13 +191,41 @@
 			gap: 0.4rem;
 		}
 
+		/*
+		 * Three columns cannot fit two long words beside an empty centre on a phone, so the
+		 * cross becomes a diamond: up and down span the width, left and right share it.
+		 */
+		.choices:not(.vertical) {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			grid-template-areas:
+				'up up'
+				'left right'
+				'down down';
+			justify-content: stretch;
+		}
+
+		.up,
+		.down {
+			justify-self: center;
+		}
+
+		.choice {
+			min-width: min(7.5em, 40vw);
+			padding: 0.5em 0.8em;
+		}
+
+		.left,
+		.right {
+			min-width: 0;
+		}
+
+		.arrow {
+			display: none;
+		}
+
 		.rich {
 			min-width: 0;
 			padding: 0.55em 0.8em;
-		}
-
-		.rich .arrow {
-			display: none;
 		}
 
 		.label small {

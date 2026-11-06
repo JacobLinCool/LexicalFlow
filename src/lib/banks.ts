@@ -1,7 +1,8 @@
-import { loadQuestions } from './data';
+import { loadBank, type Bank } from './data';
+import { frontierBand, loadLearner } from './learner';
 import { CATEGORIES, type Category, type Question } from './types';
 
-export type LevelId = 'easy' | 'medium' | 'hard' | 'all';
+export type LevelId = 'easy' | 'medium' | 'hard' | 'all' | 'mine';
 
 export interface Level {
 	id: LevelId;
@@ -10,17 +11,51 @@ export interface Level {
 	/** Inclusive difficulty range; a question's difficulty is its rarest choice's band. */
 	min: number;
 	max: number;
+	/** Select by the answer word's frequency band around the learner's frontier instead (see myBands). */
+	frontier?: boolean;
 }
 
 export const LEVELS: Level[] = [
 	{ id: 'easy', label: 'Easy', detail: 'Everyday words only', min: 1, max: 2 },
 	{ id: 'medium', label: 'Medium', detail: 'Common to intermediate', min: 1, max: 3 },
 	{ id: 'hard', label: 'Hard', detail: 'Less common words', min: 3, max: 5 },
-	{ id: 'all', label: 'All', detail: 'Every level', min: 1, max: 5 }
+	{ id: 'all', label: 'All', detail: 'Every level', min: 1, max: 5 },
+	{ id: 'mine', label: 'My level', detail: 'Around where your new words come from', min: 1, max: 5, frontier: true }
 ];
 
 export function level(id: string): Level {
 	return LEVELS.find((l) => l.id === id) ?? LEVELS[1];
+}
+
+/** 'My level' plays these frequency bands relative to the learner's frontier band. */
+const MINE_BELOW = 2;
+const MINE_ABOVE = 1;
+
+/** Inclusive range of frequency bands. */
+export interface BandRange {
+	from: number;
+	to: number;
+}
+
+/**
+ * The bands 'My level' plays: two below the learner's frontier to one above, within the bank.
+ * Null before the level test, when 'My level' falls back to Medium.
+ */
+export async function myBands(): Promise<BandRange | null> {
+	const state = loadLearner();
+	if (!state.placement) return null;
+	const { lexicon } = await builtinBank();
+	const frontier = frontierBand(state, lexicon);
+	return { from: Math.max(1, frontier - MINE_BELOW), to: Math.min(lexicon.bands, frontier + MINE_ABOVE) };
+}
+
+/** Built-in questions whose answer word lies in `range` (by the bank's frequency bands). */
+export async function inBands(questions: Question[], range: BandRange): Promise<Question[]> {
+	const { lexicon } = await builtinBank();
+	return questions.filter((q) => {
+		const band = lexicon.words.get(q.lemma)?.band;
+		return band !== undefined && band >= range.from && band <= range.to;
+	});
 }
 
 export interface BuiltinBank {
@@ -123,24 +158,33 @@ export interface Playable {
 	name: string;
 	/** False when the level filter does not apply (custom question banks). */
 	levelled: boolean;
+	/** The level actually applied when levelled, which differs from the one asked for after a fallback. */
+	level?: LevelId;
 }
 
-let builtin: Promise<Question[]> | null = null;
-/** The bundled bank, fetched once per page. */
-export function builtinQuestions(): Promise<Question[]> {
-	builtin ??= loadQuestions().catch((error) => {
+let builtin: Promise<Bank> | null = null;
+/** The bundled bank (questions, word list and manifest), fetched once per page; retried after a failure. */
+export function builtinBank(): Promise<Bank> {
+	builtin ??= loadBank().catch((error) => {
 		builtin = null;
 		throw error;
 	});
 	return builtin;
 }
 
+/** Every question of the bundled bank. */
+export async function builtinQuestions(): Promise<Question[]> {
+	return (await builtinBank()).questions;
+}
+
 /**
  * Questions for a bank id and level. Falls back to all built-in questions at that level
- * when a custom bank is missing or yields nothing.
+ * when a custom bank is missing or yields nothing; 'My level' falls back to Medium before the
+ * level test or when no question lies in its bands, and any level to All when it matches
+ * nothing. `level` reports the level that was applied.
  */
 export async function resolvePlayable(bankId: string, levelId: LevelId): Promise<Playable> {
-	const l = level(levelId);
+	let l = level(levelId);
 	if (bankId.startsWith(CUSTOM_PREFIX)) {
 		const bank = await getCustomBank(bankId.slice(CUSTOM_PREFIX.length)).catch(() => undefined);
 		if (bank?.kind === 'questions' && bank.questions.length) {
@@ -155,7 +199,14 @@ export async function resolvePlayable(bankId: string, levelId: LevelId): Promise
 	const all = await builtinQuestions();
 	const topic = (CATEGORIES as readonly string[]).includes(bankId) ? bankId : null;
 	const pick = (lv: Level) => all.filter((q) => (!topic || q.category === topic) && inLevel(q, lv));
-	const questions = pick(l);
 	const name = BUILTIN_BANKS.find((b) => b.id === (topic ?? 'all'))?.label ?? 'All topics';
-	return { questions: questions.length ? questions : pick(LEVELS[3]), name, levelled: true };
+	if (l.frontier) {
+		const range = await myBands().catch(() => null);
+		const questions = range ? await inBands(pick(l), range) : [];
+		if (questions.length) return { questions, name, levelled: true, level: l.id };
+		l = level('medium');
+	}
+	const questions = pick(l);
+	if (questions.length) return { questions, name, levelled: true, level: l.id };
+	return { questions: pick(level('all')), name, levelled: true, level: 'all' };
 }

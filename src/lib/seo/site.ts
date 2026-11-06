@@ -15,4 +15,4 @@ export function absolute(path: string): string | null {
 }
 
 /** Pages listed in the sitemap, relative to the base path. */
-export const PAGES = ['/', '/profile', '/banks'];
+export const PAGES = ['/', '/plan', '/profile', '/banks'];

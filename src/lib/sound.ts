@@ -32,5 +32,7 @@ export const sounds = {
 	prime: () => void context(),
 	correct: () => blip([880, 1318.5], 0.09),
 	incorrect: () => blip([220], 0.14, 0.05),
-	timeout: () => blip([196, 174.6], 0.12, 0.04)
+	timeout: () => blip([196, 174.6], 0.12, 0.04),
+	/** A rising arpeggio for a new level. */
+	levelUp: () => blip([523.3, 659.3, 784, 1046.5], 0.16, 0.07)
 };

@@ -3,7 +3,7 @@ import type { ModeId } from './modes';
 import { RESPONSE_WINDOW_MS } from './scoring';
 import type { Outcome, Question, Result } from './types';
 
-const PROGRESS_KEY = 'lexical-flow:progress:v1';
+export const PROGRESS_KEY = 'lexical-flow:progress:v1';
 const SETTINGS_KEY = 'lexical-flow:settings:v1';
 
 /** Per-word tally: [attempts, correct, incorrect, timedOut, totalAnswerMs, lastSeenEpochSeconds]. */
@@ -34,6 +34,12 @@ export interface Progress {
 	times: number[];
 	/** Completed runs, newest last, capped at RUN_HISTORY. */
 	runs: RunRecord[];
+	/** Experience earned in all (see xp.ts). */
+	xp: number;
+	/** Experience by local calendar day, keyed YYYY-MM-DD. */
+	xpDays: Record<string, number>;
+	/** The last day (YYYY-MM-DD) whose finished Learn plan earned its bonus. */
+	dayDone: string | null;
 }
 
 /** [attempts, correct, timedOut, answerMs (answered only), score]. */
@@ -61,11 +67,26 @@ export interface Best {
 	at: number;
 }
 
+/** Meaning shown after an answer: English definition, Traditional Chinese, or both. */
+export type GlossLanguage = 'en' | 'zh' | 'both';
+
 export interface Settings {
 	sound: boolean;
 	/** Selected bank id: a built-in id ('all' or a category) or 'custom:<id>'. */
 	bank: string;
 	level: LevelId;
+	gloss: GlossLanguage;
+	/** Say the answer word aloud in learn mode. */
+	speak: boolean;
+	/** Pause on a missed or unfamiliar word so its meaning can be read. */
+	studyPause: boolean;
+}
+
+/** Browsers that list Chinese among their languages get both glosses; everyone else English. */
+function defaultGloss(): GlossLanguage {
+	if (typeof navigator === 'undefined') return 'en';
+	const languages = navigator.languages?.length ? navigator.languages : [navigator.language];
+	return languages.some((l) => l?.toLowerCase().startsWith('zh')) ? 'both' : 'en';
 }
 
 export function emptyProgress(): Progress {
@@ -84,7 +105,10 @@ export function emptyProgress(): Progress {
 		levels: {},
 		days: {},
 		times: new Array(TIME_BINS).fill(0),
-		runs: []
+		runs: [],
+		xp: 0,
+		xpDays: {},
+		dayDone: null
 	};
 }
 
@@ -106,7 +130,25 @@ function write(key: string, value: unknown): void {
 }
 
 export function loadProgress(): Progress {
-	return { ...emptyProgress(), ...read<Progress>(PROGRESS_KEY) };
+	const stored = read<Progress>(PROGRESS_KEY);
+	return withXp({ ...emptyProgress(), ...stored }, stored);
+}
+
+/**
+ * Saves from before experience existed start with the XP their scored answers would have earned
+ * (a tenth of their points), so a long-time player does not restart at level 1.
+ */
+export function withXp(progress: Progress, stored: Partial<Progress> | null): Progress {
+	if (stored && typeof stored.xp !== 'number') progress.xp = Math.round((stored.totalScore ?? 0) / 10);
+	return progress;
+}
+
+/** Add experience to the total and to today's tally. */
+export function addXp(progress: Progress, amount: number, now = new Date()): void {
+	if (amount <= 0) return;
+	progress.xp += amount;
+	const day = dayKey(now);
+	progress.xpDays[day] = (progress.xpDays[day] ?? 0) + amount;
 }
 
 export function saveProgress(progress: Progress): void {
@@ -114,7 +156,15 @@ export function saveProgress(progress: Progress): void {
 }
 
 export function loadSettings(): Settings {
-	return { sound: false, bank: 'all', level: 'medium', ...read<Settings>(SETTINGS_KEY) };
+	return {
+		sound: false,
+		bank: 'all',
+		level: 'medium',
+		gloss: defaultGloss(),
+		speak: false,
+		studyPause: true,
+		...read<Settings>(SETTINGS_KEY)
+	};
 }
 
 export function saveSettings(settings: Settings): void {

@@ -13,9 +13,14 @@
 
 	let { points, max, label, height = 160 }: Props = $props();
 
+	/** Rough widths of an 11px axis character and a 12px semibold tooltip character. */
+	const CHAR_W = 7;
+	const TIP_CHAR_W = 7;
+
 	/** Drawn at the rendered pixel width so text stays the same size at any width. */
 	let W = $state(600);
-	const PAD = { top: 16, right: 12, bottom: 12, left: 40 };
+	/** The left pad fits the widest tick label. */
+	const PAD = $derived({ top: 16, right: 12, bottom: 12, left: Math.max(24, Math.ceil(String(Math.round(max)).length * CHAR_W) + 14) });
 	const plotH = $derived(height - PAD.top - PAD.bottom);
 	const x = (i: number) =>
 		PAD.left + (points.length < 2 ? (W - PAD.left - PAD.right) / 2 : (i * (W - PAD.left - PAD.right)) / (points.length - 1));
@@ -48,7 +53,8 @@
 			<circle class="dot" cx={x(i)} cy={y(p.value)} r={hover === i ? 5 : 3} />
 		{/each}
 		{#if hover !== null}
-			<text class="tip" x={Math.min(W - 90, Math.max(PAD.left + 90, x(hover)))} y={PAD.top - 2} text-anchor="middle"
+			{@const half = (points[hover].tip.length * TIP_CHAR_W) / 2}
+			<text class="tip" x={Math.max(half, Math.min(x(hover), W - half))} y={PAD.top - 2} text-anchor="middle"
 				>{points[hover].tip}</text
 			>
 		{/if}

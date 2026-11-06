@@ -8,10 +8,12 @@
 		answer?: Direction;
 		phase: Phase;
 		picked: Direction | null;
+		/** Length of a study pause (ms), counted down under the choices. */
+		studyMs?: number;
 		onpick: (direction: Direction, at: number) => void;
 	}
 
-	let { options, answer, phase, picked, onpick }: Props = $props();
+	let { options, answer, phase, picked, studyMs = 0, onpick }: Props = $props();
 
 	const ARROWS: Record<Direction, string> = { up: '↑', left: '←', down: '↓', right: '→' };
 	const ready = $derived(phase === 'active' || phase === 'card');
@@ -19,17 +21,28 @@
 	const concealed = $derived(answer !== undefined && (phase === 'entering' || phase === 'reading'));
 	/** Up/down-only cards stack in one column instead of leaving the side cells empty. */
 	const vertical = $derived(!options.left && !options.right);
+	/** The verdict stays on, dimmed, while a missed or new word's meaning is studied. */
+	const studying = $derived(phase === 'study');
 
 	function tone(direction: Direction): string | undefined {
 		if (phase === 'locked') return direction === picked ? 'selected' : undefined;
-		if (phase !== 'feedback') return undefined;
+		if (phase !== 'feedback' && phase !== 'study') return undefined;
 		if (direction === answer) return picked === direction ? 'correct' : 'reveal';
 		if (direction === picked) return 'wrong';
 		return 'muted';
 	}
 </script>
 
-<div class="choices" class:ready class:vertical class:concealed aria-hidden={concealed} role="group" aria-label="Choices">
+<div
+	class="choices"
+	class:ready
+	class:vertical
+	class:concealed
+	class:studying
+	aria-hidden={concealed}
+	role="group"
+	aria-label="Choices"
+>
 	{#each DIRECTIONS as direction (direction)}
 		{@const option = options[direction]}
 		{#if option}
@@ -52,6 +65,11 @@
 		{/if}
 	{/each}
 </div>
+{#if studying}
+	<p class="continue" style:--study="{studyMs}ms">
+		<span class="keys">Any key to continue</span><span class="taps">Tap to continue</span>
+	</p>
+{/if}
 
 <style>
 	.choices {
@@ -186,6 +204,64 @@
 		opacity: 0.35;
 	}
 
+	.studying {
+		opacity: 0.45;
+	}
+
+	/* Taps fall through to the stage, which ends the pause. */
+	.studying .choice {
+		pointer-events: none;
+	}
+
+	.continue {
+		position: relative;
+		width: max-content;
+		margin: 0.85rem 0 0;
+		padding-bottom: 0.4rem;
+		font-size: 0.8rem;
+		font-weight: 500;
+		color: var(--text-muted);
+		animation: continue-in 200ms ease-out;
+	}
+
+	/* The pause drains like the response timer, so its end is no surprise. */
+	.continue::after {
+		content: '';
+		position: absolute;
+		inset: auto 0 0;
+		height: 2px;
+		border-radius: 999px;
+		background: var(--text-muted);
+		transform-origin: left center;
+		animation: drain var(--study) linear forwards;
+	}
+
+	.taps {
+		display: none;
+	}
+
+	@media (hover: none) and (pointer: coarse) {
+		.keys {
+			display: none;
+		}
+
+		.taps {
+			display: inline;
+		}
+	}
+
+	@keyframes continue-in {
+		from {
+			opacity: 0;
+		}
+	}
+
+	@keyframes drain {
+		to {
+			transform: scaleX(0);
+		}
+	}
+
 	@media (max-width: 640px) {
 		.choices {
 			gap: 0.4rem;
@@ -230,6 +306,10 @@
 
 		.label small {
 			font-size: 0.62em;
+		}
+
+		.continue {
+			margin-inline: auto;
 		}
 	}
 

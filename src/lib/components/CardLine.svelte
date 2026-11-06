@@ -34,5 +34,7 @@
 		font-weight: 500;
 		opacity: 0.6;
 		font-variant-numeric: tabular-nums;
+		/* A subtitle may hold a second line, e.g. a test result's plan. */
+		white-space: pre-line;
 	}
 </style>

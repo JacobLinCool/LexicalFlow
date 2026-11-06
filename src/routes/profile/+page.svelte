@@ -1,19 +1,40 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
+	import { builtinBank } from '#lib/banks.ts';
 	import Bars from '#lib/charts/Bars.svelte';
 	import Radar from '#lib/charts/Radar.svelte';
 	import Trend from '#lib/charts/Trend.svelte';
 	import Page from '#lib/components/Page.svelte';
+	import {
+		bandCoverage,
+		dueCount,
+		estimateReady,
+		estimateVocabulary,
+		loadLearner,
+		roundEstimate,
+		type LearnerState
+	} from '#lib/learner.ts';
 	import { MODES } from '#lib/modes.ts';
 	import { TIME_BINS, averageMs, dayKey, loadProgress, resetProgress, type Progress, type Tally } from '#lib/progress.ts';
 	import Seo from '#lib/seo/Seo.svelte';
-	import { CATEGORIES } from '#lib/types.ts';
+	import { CATEGORIES, type Lexicon } from '#lib/types.ts';
+	import { XP, levelOf, streakDays } from '#lib/xp.ts';
 
 	let progress = $state<Progress | null>(null);
 	let confirming = $state(false);
+	let learner = $state.raw<LearnerState | null>(null);
+	let lexicon = $state.raw<Lexicon | null>(null);
 
 	onMount(() => {
 		progress = loadProgress();
+		learner = loadLearner();
+		if (learner.placement || Object.keys(learner.cards).length) {
+			builtinBank().then(
+				(bank) => (lexicon = bank.lexicon),
+				() => {}
+			);
+		}
 	});
 
 	const n = (v: number) => v.toLocaleString('en-US');
@@ -27,8 +48,40 @@
 		return { accuracy: t[1] / t[0], points: t[4] / t[0], attempts: t[0] };
 	}
 
-	/** A word counts as mastered after two or more attempts at 80% accuracy or better. */
-	const MASTERED = { attempts: 2, accuracy: 0.8 };
+	/**
+	 * A word counts as answered well after two or more attempts at 80% accuracy or better. This
+	 * is a play statistic, not the course's "mastered" (remembered for three weeks or more).
+	 */
+	const ANSWERED_WELL = { attempts: 2, accuracy: 0.8 };
+
+	/** Level, experience and the run of days played. */
+	const standing = $derived.by(() => {
+		const p = progress;
+		if (!p || !(p.xp > 0 || p.attempted > 0)) return null;
+		const today = new Date();
+		return {
+			...levelOf(p.xp),
+			xp: p.xp,
+			today: p.xpDays[dayKey(today)] ?? 0,
+			streak: streakDays(p.days, today, dayKey)
+		};
+	});
+
+	/** The long-term course at a glance; null before the level test or any learn-mode word. */
+	const vocabulary = $derived.by(() => {
+		if (!learner || !lexicon) return null;
+		const now = Date.now();
+		const coverage = bandCoverage(learner, lexicon, now);
+		return {
+			// Before the level test or enough first answers the estimate is only the prior: not shown.
+			estimate: estimateReady(learner) ? roundEstimate(estimateVocabulary(learner, lexicon, now)) : null,
+			// Learners who skipped the level test get an estimate from first answers alone.
+			placed: learner.placement !== null,
+			mastered: coverage.reduce((s, b) => s + b.mastered, 0),
+			learning: coverage.reduce((s, b) => s + b.learning, 0),
+			due: dueCount(learner, now)
+		};
+	});
 
 	const view = $derived.by(() => {
 		const p = progress;
@@ -39,13 +92,13 @@
 			accuracy: w[1] / w[0],
 			avgMs: w[0] - w[3] > 0 ? w[4] / (w[0] - w[3]) : null
 		}));
-		const rated = words.filter((w) => w.attempts >= MASTERED.attempts);
-		const mastered = rated.filter((w) => w.accuracy >= MASTERED.accuracy);
+		const rated = words.filter((w) => w.attempts >= ANSWERED_WELL.attempts);
+		const answeredWell = rated.filter((w) => w.accuracy >= ANSWERED_WELL.accuracy);
 		const weakest = [...rated]
 			.filter((w) => w.accuracy < 1)
 			.sort((a, b) => a.accuracy - b.accuracy || b.attempts - a.attempts)
 			.slice(0, 12);
-		const strongest = [...mastered]
+		const strongest = [...answeredWell]
 			.sort((a, b) => b.accuracy - a.accuracy || (a.avgMs ?? Infinity) - (b.avgMs ?? Infinity))
 			.slice(0, 12);
 
@@ -64,7 +117,7 @@
 		const runs = p.runs.slice(-40);
 		const runsByMode = Object.fromEntries(MODES.map((m) => [m.id, p.runs.filter((r) => r.mode === m.id).length]));
 
-		return { p, words, mastered, weakest, strongest, categories, levels, days, runs, runsByMode };
+		return { p, words, answeredWell, weakest, strongest, categories, levels, days, runs, runsByMode };
 	});
 
 	function reset() {
@@ -85,6 +138,63 @@
 		? `Playing since ${new Date(view.p.since).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}. Everything here is stored only in this browser.`
 		: 'Everything here is stored only in this browser.'}
 >
+	{#if standing}
+		<section>
+			<h2>Level</h2>
+			<dl class="tiles">
+				<div class="level-tile">
+					<dt>Level</dt>
+					<dd>{standing.level}</dd>
+					<span class="xp-track" aria-hidden="true"
+						><span class="xp-fill" style:transform="scaleX({standing.into / standing.span})"></span></span
+					>
+					<small>{n(standing.into)} / {n(standing.span)} XP to level {standing.level + 1}</small>
+				</div>
+				<div><dt>Total XP</dt><dd>{n(standing.xp)}</dd></div>
+				<div><dt>XP today</dt><dd>{n(standing.today)}</dd></div>
+				<div>
+					<dt>Day streak</dt>
+					<dd>{n(standing.streak)}</dd>
+					<small>{standing.streak === 1 ? 'day' : 'days'} in a row with practice</small>
+				</div>
+			</dl>
+			<p class="note">
+				Learn and the level test give {XP.learnCorrect} XP for a right answer and {XP.learnMiss} for a miss; the scored modes
+				give a tenth of an answer's points. A word reaching mastered adds {XP.mastered}, and finishing the day's plan
+				{XP.dayDone}.
+			</p>
+		</section>
+	{/if}
+
+	{#if vocabulary}
+		<section>
+			<h2>Vocabulary</h2>
+			<dl class="tiles">
+				<div>
+					<dt>Estimated words</dt>
+					{#if vocabulary.estimate === null}
+						<dd>—</dd>
+						<small>After the level test</small>
+					{:else}
+						<dd><small>≈ </small>{n(vocabulary.estimate)}</dd>
+					{/if}
+				</div>
+				<div><dt>Mastered</dt><dd>{n(vocabulary.mastered)}</dd><small>Remembered 3+ weeks</small></div>
+				<div><dt>Learning</dt><dd>{n(vocabulary.learning)}</dd></div>
+				<div><dt>Due now</dt><dd>{n(vocabulary.due)}</dd></div>
+			</dl>
+			<p class="note">
+				{vocabulary.estimate === null
+					? 'Your estimate shows after the level test or a few dozen first answers.'
+					: vocabulary.placed
+						? 'An estimate from the level test and your answers since.'
+						: 'An estimate from your answers so far; the level test makes it sharper.'} Mastered words are ones the course
+				expects you to remember for three weeks or more.
+				<a href={resolve('/plan')}>Your plan →</a>
+			</p>
+		</section>
+	{/if}
+
 	{#if !view}
 		<p class="empty">Loading…</p>
 	{:else if !view.p.attempted}
@@ -99,11 +209,17 @@
 				<div><dt>Average response</dt><dd>{secs(averageMs(p))}</dd></div>
 				<div><dt>Total score</dt><dd>{n(p.totalScore)}</dd></div>
 				<div><dt>Runs finished</dt><dd>{n(p.runs.length)}</dd></div>
-				<div><dt>Words mastered</dt><dd>{n(view.mastered.length)}<small> / {n(view.words.length)} seen</small></dd></div>
+				<div>
+					<dt>Words answered well</dt>
+					<dd>{n(view.answeredWell.length)}</dd>
+					<small>of {n(view.words.length)} seen</small>
+				</div>
 			</dl>
 			<p class="note">
-				{n(p.correct)} correct, {n(p.incorrect)} wrong, {n(p.timedOut)} timed out. A word counts as mastered after
-				{MASTERED.attempts}+ attempts at {MASTERED.accuracy * 100}% accuracy or better.
+				{n(p.correct)} correct, {n(p.incorrect)} wrong, {n(p.timedOut)} timed out. A word counts as answered well after
+				{ANSWERED_WELL.attempts}+ attempts at {ANSWERED_WELL.accuracy * 100}% accuracy or better, in any mode{vocabulary
+					? '; that is about your answers so far, while Mastered above is about how long you will remember a word'
+					: ''}.
 			</p>
 		</section>
 
@@ -169,10 +285,16 @@
 				<h2 class="spaced">Response time</h2>
 				<Bars
 					label="Number of answers by response time"
-					bars={Array.from({ length: TIME_BINS }, (_, i) => p.times[i] ?? 0).map((count, i) => ({
+					bars={Array.from({ length: TIME_BINS }, (_, i) =>
+						// Answers from the longer windows of earlier versions join the last bin.
+						i < TIME_BINS - 1 ? (p.times[i] ?? 0) : p.times.slice(i).reduce((a, b) => a + b, 0)
+					).map((count, i) => ({
 						label: `${(i * 0.5).toFixed(1)}s`,
 						value: count,
-						tip: `${n(count)} answered in ${(i * 0.5).toFixed(1)}–${((i + 1) * 0.5).toFixed(1)}s`
+						tip:
+							i < TIME_BINS - 1
+								? `${n(count)} answered in ${(i * 0.5).toFixed(1)}–${((i + 1) * 0.5).toFixed(1)}s`
+								: `${n(count)} answered in ${(i * 0.5).toFixed(1)}s or more`
 					}))}
 				/>
 			</section>
@@ -282,10 +404,38 @@
 		color: var(--text-muted);
 	}
 
+	.level-tile .xp-track {
+		display: block;
+		height: 0.3rem;
+		margin: 0.55rem 0 0.4rem;
+		border-radius: 999px;
+		background: var(--surface-strong);
+		overflow: hidden;
+	}
+
+	.level-tile .xp-fill {
+		display: block;
+		height: 100%;
+		background: var(--ink);
+		opacity: 0.85;
+		transform-origin: left center;
+	}
+
 	.note {
 		margin: 0.75rem 0 0;
 		font-size: 0.8rem;
 		color: var(--text-muted);
+	}
+
+	.note a {
+		color: var(--text-secondary);
+		font-weight: 600;
+		text-decoration: none;
+		white-space: nowrap;
+	}
+
+	.note a:hover {
+		color: var(--ink);
 	}
 
 	.grid {

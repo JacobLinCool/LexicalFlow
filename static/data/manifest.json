@@ -1,23 +1,123 @@
 {
-  "version": "9459a11fe37f",
-  "questionCount": 22272,
-  "vocabularyCount": 12000,
-  "categories": {
-    "travel": {
-      "file": "questions/travel.json",
-      "count": 2210
+  "format": 2,
+  "version": "38fda3818caf",
+  "questionCount": 67953,
+  "vocabularyCount": 17493,
+  "bandSize": 1000,
+  "bands": [
+    {
+      "band": 1,
+      "file": "bands/01.json",
+      "words": 1000,
+      "questions": 5682
     },
-    "conversation": {
-      "file": "questions/conversation.json",
-      "count": 15865
+    {
+      "band": 2,
+      "file": "bands/02.json",
+      "words": 1000,
+      "questions": 5516
     },
-    "networking": {
-      "file": "questions/networking.json",
-      "count": 2139
+    {
+      "band": 3,
+      "file": "bands/03.json",
+      "words": 1000,
+      "questions": 5282
     },
-    "academic": {
-      "file": "questions/academic.json",
-      "count": 2058
+    {
+      "band": 4,
+      "file": "bands/04.json",
+      "words": 1000,
+      "questions": 5119
+    },
+    {
+      "band": 5,
+      "file": "bands/05.json",
+      "words": 1000,
+      "questions": 4896
+    },
+    {
+      "band": 6,
+      "file": "bands/06.json",
+      "words": 1000,
+      "questions": 4706
+    },
+    {
+      "band": 7,
+      "file": "bands/07.json",
+      "words": 1000,
+      "questions": 4345
+    },
+    {
+      "band": 8,
+      "file": "bands/08.json",
+      "words": 1000,
+      "questions": 4274
+    },
+    {
+      "band": 9,
+      "file": "bands/09.json",
+      "words": 1000,
+      "questions": 3918
+    },
+    {
+      "band": 10,
+      "file": "bands/10.json",
+      "words": 1000,
+      "questions": 3735
+    },
+    {
+      "band": 11,
+      "file": "bands/11.json",
+      "words": 1000,
+      "questions": 3394
+    },
+    {
+      "band": 12,
+      "file": "bands/12.json",
+      "words": 1000,
+      "questions": 3267
+    },
+    {
+      "band": 13,
+      "file": "bands/13.json",
+      "words": 1000,
+      "questions": 2954
+    },
+    {
+      "band": 14,
+      "file": "bands/14.json",
+      "words": 1000,
+      "questions": 2751
+    },
+    {
+      "band": 15,
+      "file": "bands/15.json",
+      "words": 1000,
+      "questions": 2586
+    },
+    {
+      "band": 16,
+      "file": "bands/16.json",
+      "words": 1000,
+      "questions": 2359
+    },
+    {
+      "band": 17,
+      "file": "bands/17.json",
+      "words": 1000,
+      "questions": 2180
+    },
+    {
+      "band": 18,
+      "file": "bands/18.json",
+      "words": 493,
+      "questions": 989
     }
+  ],
+  "categories": {
+    "travel": 6614,
+    "conversation": 49200,
+    "networking": 6096,
+    "academic": 6043
   }
 }

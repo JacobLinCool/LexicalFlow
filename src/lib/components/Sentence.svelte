@@ -62,8 +62,8 @@
 		color: var(--negative);
 	}
 
-	/* The underline drains over the response window (--window); its last second (90–100% of
-	   a 10 s window) warms up. */
+	/* The underline drains over the response window (--window); its last second (87.5–100% of
+	   an 8 s window) warms up. */
 	.timer {
 		position: absolute;
 		inset: 0;
@@ -90,20 +90,20 @@
 
 	@keyframes urgency {
 		0%,
-		90% {
+		87.5% {
 			background: var(--ink);
 			opacity: 0.9;
 			box-shadow: none;
 		}
-		92.5% {
+		90.625% {
 			background: var(--urgent);
 			opacity: 1;
 			box-shadow: 0 0 0.5em var(--urgent);
 		}
-		95% {
+		93.75% {
 			opacity: 0.55;
 		}
-		97.5% {
+		96.875% {
 			opacity: 1;
 		}
 		100% {

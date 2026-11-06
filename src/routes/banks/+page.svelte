@@ -6,12 +6,15 @@
 		BUILTIN_BANKS,
 		CUSTOM_PREFIX,
 		LEVELS,
-		builtinQuestions,
+		builtinBank,
 		deleteCustomBank,
 		inLevel,
+		level,
 		listCustomBanks,
 		matchWords,
+		myBands,
 		saveCustomBank,
+		type BandRange,
 		type CustomBank,
 		type LevelId
 	} from '#lib/banks.ts';
@@ -19,11 +22,14 @@
 	import { ImportError, importUrl, nameFromUrl, parseBank, toCustomBank, type ParsedBank } from '#lib/importer.ts';
 	import { loadSettings, saveSettings } from '#lib/progress.ts';
 	import Seo from '#lib/seo/Seo.svelte';
-	import type { Question } from '#lib/types.ts';
+	import type { Lexicon, Question } from '#lib/types.ts';
 
 	let selected = $state('all');
 	let levelId = $state<LevelId>('medium');
 	let builtin = $state.raw<Question[]>([]);
+	let lexicon = $state.raw<Lexicon | null>(null);
+	/** Bands 'My level' plays; null before the level test. */
+	let mine = $state.raw<BandRange | null>(null);
 	let custom = $state<CustomBank[]>([]);
 
 	let url = $state('');
@@ -36,7 +42,8 @@
 		const settings = loadSettings();
 		selected = settings.bank;
 		levelId = settings.level;
-		[builtin, custom] = await Promise.all([builtinQuestions(), listCustomBanks()]);
+		const [bank, banks, range] = await Promise.all([builtinBank(), listCustomBanks(), myBands().catch(() => null)]);
+		[builtin, lexicon, custom, mine] = [bank.questions, bank.lexicon, banks, range];
 	});
 
 	function persist() {
@@ -54,8 +61,24 @@
 	}
 
 	const levelObj = $derived(LEVELS.find((l) => l.id === levelId) ?? LEVELS[1]);
+	/** 'My level' without a level test plays Medium, like resolvePlayable. */
+	const effective = $derived(levelObj.frontier && !mine ? (LEVELS.find((l) => l.id === 'medium') ?? levelObj) : levelObj);
+	function inRange(q: Question): boolean {
+		if (!effective.frontier || !mine || !lexicon) return true;
+		const band = lexicon.words.get(q.lemma)?.band;
+		return band !== undefined && band >= mine.from && band <= mine.to;
+	}
 	function builtinCount(id: string): number {
-		return builtin.filter((q) => (id === 'all' || q.category === id) && inLevel(q, levelObj)).length;
+		const count = (l: typeof effective, ranged: boolean) =>
+			builtin.filter((q) => (id === 'all' || q.category === id) && inLevel(q, l) && (!ranged || inRange(q))).length;
+		// Mirror resolvePlayable: 'My level' with nothing in its bands plays Medium, and an empty level plays All.
+		const counted = count(effective, true) || (effective.frontier ? count(level('medium'), false) : 0);
+		return counted || count(level('all'), false);
+	}
+	function levelDetail(l: (typeof LEVELS)[number]): string {
+		if (!l.frontier) return l.detail;
+		if (!mine || !lexicon) return 'After the level test';
+		return `Words ${n((mine.from - 1) * lexicon.bandSize + 1)}–${n(mine.to * lexicon.bandSize)}`;
 	}
 	function customCount(bank: CustomBank): string {
 		if (bank.kind === 'questions') return `${n(bank.questions.length)} questions`;
@@ -186,11 +209,15 @@ hypothesis`;
 			{#each LEVELS as l (l.id)}
 				<button type="button" role="radio" aria-checked={levelId === l.id} class:on={levelId === l.id} onclick={() => setLevel(l.id)}>
 					<strong>{l.label}</strong>
-					<small>{l.detail}</small>
+					<small>{levelDetail(l)}</small>
 				</button>
 			{/each}
 		</div>
-		<p class="note">A question is as hard as its rarest choice. Difficulty applies to the built-in topics.</p>
+		<p class="note">
+			A question is as hard as its rarest choice. Difficulty applies to the built-in topics. My level plays words around
+			where your new words come from: two frequency bands below to one above{#if !mine}; it needs the
+				<a href="{resolve('/')}?start=placement">level test</a> and plays Medium until then{/if}.
+		</p>
 	</section>
 
 	<section>
@@ -302,6 +329,14 @@ hypothesis`;
 		font-size: 0.8rem;
 		color: var(--text-muted);
 		line-height: 1.5;
+	}
+
+	.note a {
+		color: var(--text-secondary);
+	}
+
+	.note a:hover {
+		color: var(--ink);
 	}
 
 	button {

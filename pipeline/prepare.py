@@ -15,12 +15,14 @@ import urllib.request
 from collections import defaultdict
 
 import common  # noqa: F401  (sets NLTK_DATA)
-from common import CACHE, ITEMS, POOLS, SENTENCES, TARGET_TAGS, TATOEBA_TSV, TATOEBA_URL, WORDNET_POS, EMBED_NAME
+from common import (
+    CACHE, ITEMS, POOLS, SENTENCES, TARGET_TAGS, TATOEBA_TSV, TATOEBA_URL, WORDNET_POS, EMBED_NAME, vowel_sound,
+)
 
 SEED = 20261103
 MIN_WORDS, MAX_WORDS = 6, 22
 MIN_ZIPF = 2.3
-SENTENCES_PER_LEMMA = 4
+SENTENCES_PER_LEMMA = 10
 MAX_ITEMS_PER_SENTENCE = 2
 POOL_RELATED = 6
 POOL_RANDOM = 2
@@ -193,10 +195,6 @@ def surface_pos(form: str) -> frozenset[str]:
     return frozenset(p for p, w in (("n", "n"), ("v", "v"), ("adj", "a")) if wn._morphy(form, w))
 
 
-def starts_with_vowel_sound(word: str) -> bool:
-    return word[0] in "aeiou" and not word.startswith(("uni", "use", "usu", "uti", "eu", "one"))
-
-
 def build_pools(vocab: dict[tuple[str, str], float], rng: random.Random) -> dict[tuple[str, str], list[str]]:
     """Related-first distractor pools per lemma, cached because the WordNet walk is slow."""
     if POOLS.exists():
@@ -308,7 +306,7 @@ def main() -> None:
                         # class, so ambiguous answers get distractors with the same ambiguity.
                         if not (answer_pos & {"n", "v"}) <= surface_pos(form):
                             continue
-                        if prev in ("a", "an") and starts_with_vowel_sound(form) != starts_with_vowel_sound(answer):
+                        if prev in ("a", "an") and vowel_sound(form) != vowel_sound(answer):
                             continue
                         cands.append(form)
                         taken += 1
